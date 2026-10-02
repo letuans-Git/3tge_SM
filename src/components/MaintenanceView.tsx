@@ -9,19 +9,21 @@ import {
   AlertTriangle, 
   Clock, 
   Calendar, 
-  Send,
-  Eye,
-  User,
-  X,
-  FileSpreadsheet,
-  Edit3,
-  Trash2
+  Send, 
+  Eye, 
+  User, 
+  X, 
+  FileSpreadsheet, 
+  Edit3, 
+  Trash2,
+  Printer
 } from 'lucide-react';
 import { Customer, MaintenanceRecord } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { exportMaintenanceToExcel, exportMaintenancePDF } from '../utils/exportUtils';
+import { exportMaintenanceToExcel } from '../utils/exportUtils';
 import { formatDateVN } from '../utils/dateUtils';
+import { MaintenancePrintModal } from './MaintenancePrintModal';
 
 export const MaintenanceView: React.FC = () => {
   const { 
@@ -41,6 +43,7 @@ export const MaintenanceView: React.FC = () => {
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<MaintenanceRecord | null>(null);
+  const [printingRecord, setPrintingRecord] = useState<MaintenanceRecord | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [technicianName, setTechnicianName] = useState(currentUser?.fullName.split(' - ')[0] || 'Nguyễn Văn Hùng');
   const [maintenanceDate, setMaintenanceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -442,12 +445,12 @@ export const MaintenanceView: React.FC = () => {
                       <td className="py-1.5 px-2.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => exportMaintenancePDF(r)}
-                            title="In / Xuất phiếu PDF"
-                            className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 shadow-2xs transition"
+                            onClick={() => setPrintingRecord(r)}
+                            title="Xem trước & In phiếu A4 (2 phiếu/tờ, font Times New Roman)"
+                            className="px-2 py-1 rounded border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold inline-flex items-center gap-1 shadow-2xs transition active:scale-95 cursor-pointer"
                           >
-                            <Download className="w-3.5 h-3.5 text-rose-600" />
-                            <span className="hidden sm:inline">In PDF</span>
+                            <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                            <span className="hidden sm:inline">In A4</span>
                           </button>
 
                           {hasPermission('maintenance_record_edit') && (
@@ -795,6 +798,12 @@ export const MaintenanceView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal In & Xuất Phiếu Bảo Dưỡng A4 (2 Phiếu / 1 Tờ) */}
+      <MaintenancePrintModal
+        record={printingRecord}
+        isOpen={Boolean(printingRecord)}
+        onClose={() => setPrintingRecord(null)}
+      />
     </div>
   );
 };

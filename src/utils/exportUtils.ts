@@ -1,9 +1,37 @@
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import { Customer, MaintenanceRecord, CashTransaction, InventoryItem } from '../types';
 import { formatDateVN } from './dateUtils';
 
+// Helper to safely write and trigger download of XLSX file in browsers and iframes
+function downloadWorkbook(workbook: XLSX.WorkBook, filename: string) {
+  try {
+    // Generate buffer
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+  } catch (error) {
+    // Fallback to default XLSX.writeFile
+    XLSX.writeFile(workbook, filename);
+  }
+}
+
 export function exportCustomersToExcel(customers: Customer[]) {
+  if (!customers || customers.length === 0) {
+    alert('Không có dữ liệu khách hàng để xuất Excel!');
+    return;
+  }
+
   const data = customers.map((c, idx) => ({
     'STT': idx + 1,
     'Mã KH': c.customerCode,
@@ -27,10 +55,15 @@ export function exportCustomersToExcel(customers: Customer[]) {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'KhachHang_3TGE');
-  XLSX.writeFile(workbook, `3TGE_DanhSachKhachHang_${new Date().toISOString().split('T')[0]}.xlsx`);
+  downloadWorkbook(workbook, `3TGE_DanhSachKhachHang_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 export function exportMaintenanceToExcel(records: MaintenanceRecord[]) {
+  if (!records || records.length === 0) {
+    alert('Không có dữ liệu phiếu bảo dưỡng để xuất Excel!');
+    return;
+  }
+
   const data = records.map((r, idx) => ({
     'STT': idx + 1,
     'Mã phiếu': r.maintenanceCode,
@@ -47,10 +80,15 @@ export function exportMaintenanceToExcel(records: MaintenanceRecord[]) {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'PhieuBaoDuong_3TGE');
-  XLSX.writeFile(workbook, `3TGE_BaoCaoBaoDuong_${new Date().toISOString().split('T')[0]}.xlsx`);
+  downloadWorkbook(workbook, `3TGE_BaoCaoBaoDuong_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 export function exportCashFlowToExcel(transactions: CashTransaction[]) {
+  if (!transactions || transactions.length === 0) {
+    alert('Không có dữ liệu thu chi để xuất Excel!');
+    return;
+  }
+
   const data = transactions.map((t, idx) => ({
     'STT': idx + 1,
     'Mã phiếu': t.code,
@@ -68,10 +106,15 @@ export function exportCashFlowToExcel(transactions: CashTransaction[]) {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'QuyTienMat_3TGE');
-  XLSX.writeFile(workbook, `3TGE_SoQuyTienMat_${new Date().toISOString().split('T')[0]}.xlsx`);
+  downloadWorkbook(workbook, `3TGE_SoQuyTienMat_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 export function exportInventoryToExcel(items: InventoryItem[]) {
+  if (!items || items.length === 0) {
+    alert('Không có dữ liệu tồn kho để xuất Excel!');
+    return;
+  }
+
   const data = items.map((i, idx) => ({
     'STT': idx + 1,
     'Mã vật tư': i.code,
@@ -89,7 +132,7 @@ export function exportInventoryToExcel(items: InventoryItem[]) {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'TonKho_3TGE');
-  XLSX.writeFile(workbook, `3TGE_BaoCaoTonKho_${new Date().toISOString().split('T')[0]}.xlsx`);
+  downloadWorkbook(workbook, `3TGE_BaoCaoTonKho_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 export function exportMaintenancePDF(record: MaintenanceRecord) {
@@ -98,7 +141,7 @@ export function exportMaintenancePDF(record: MaintenanceRecord) {
   // Header
   doc.setFontSize(18);
   doc.setTextColor(16, 120, 70); // Green
-  doc.text('CONG TY CO PHAN CONG NGHE NANG LUONG 3TGE', 14, 20);
+  doc.text('CONG TY TNHH NANG LUONG XANH 3TGE', 14, 20);
   
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
@@ -165,5 +208,19 @@ export function exportMaintenancePDF(record: MaintenanceRecord) {
   doc.text('KY THUAT VIEN THUC HIEN', 125, yNext + 22);
   doc.text(`(${record.technicianName})`, 130, yNext + 28);
 
-  doc.save(`PhieuBaoDuong_${record.maintenanceCode}.pdf`);
+  try {
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PhieuBaoDuong_${record.maintenanceCode}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 500);
+  } catch (err) {
+    doc.save(`PhieuBaoDuong_${record.maintenanceCode}.pdf`);
+  }
 }

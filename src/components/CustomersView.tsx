@@ -76,6 +76,39 @@ export const CustomersView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  // Toast message
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  const handleExportExcelClick = () => {
+    try {
+      if (!filteredCustomers || filteredCustomers.length === 0) {
+        showToast('Không có dữ liệu khách hàng nào để xuất Excel!', 'info');
+        return;
+      }
+      exportCustomersToExcel(filteredCustomers);
+      showToast(`Đã xuất thành công tệp Excel gồm ${filteredCustomers.length} khách hàng!`, 'success');
+    } catch (err: any) {
+      console.error('Export Excel error:', err);
+      showToast('Có lỗi xảy ra khi tạo tệp Excel. Vui lòng thử lại!', 'error');
+    }
+  };
+
+  const handleOpenAddCustomerModal = () => {
+    try {
+      setEditingCustomer(null);
+      setIsModalOpen(true);
+    } catch (err) {
+      console.error('Open add customer modal error:', err);
+    }
+  };
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
@@ -243,6 +276,29 @@ export const CustomersView: React.FC = () => {
 
   return (
     <div className="space-y-2.5">
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <div className={`p-2.5 rounded-lg text-xs font-bold flex items-center justify-between border shadow-sm transition-all duration-200 ${
+          toastMessage.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+            : toastMessage.type === 'error'
+              ? 'bg-rose-50 text-rose-800 border-rose-300'
+              : 'bg-blue-50 text-blue-800 border-blue-300'
+        }`}>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className={`w-4 h-4 ${toastMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`} />
+            <span>{toastMessage.text}</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-slate-600 p-0.5"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white px-3.5 py-2 rounded-lg border border-slate-200 shadow-2xs">
         <div>
@@ -260,8 +316,9 @@ export const CustomersView: React.FC = () => {
         <div className="flex items-center gap-2">
           {hasPermission('customer_export') && (
             <button
-              onClick={() => exportCustomersToExcel(filteredCustomers)}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs"
+              type="button"
+              onClick={handleExportExcelClick}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span className="hidden sm:inline">Xuất</span> Excel
@@ -270,11 +327,9 @@ export const CustomersView: React.FC = () => {
 
           {hasPermission('customer_create') && (
             <button
-              onClick={() => {
-                setEditingCustomer(null);
-                setIsModalOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+              type="button"
+              onClick={handleOpenAddCustomerModal}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
               Thêm Khách Hàng
@@ -690,10 +745,17 @@ export const CustomersView: React.FC = () => {
         initialData={editingCustomer}
         nextCustomerCode={generateNextCustomerCode()}
         onSubmit={async (data) => {
-          if (editingCustomer) {
-            await updateCustomer(editingCustomer.id, data);
-          } else {
-            await addCustomer(data);
+          try {
+            if (editingCustomer) {
+              await updateCustomer(editingCustomer.id, data);
+              showToast(`Đã cập nhật thành công khách hàng ${editingCustomer.customerCode}!`, 'success');
+            } else {
+              const code = await addCustomer(data);
+              showToast(`Đã thêm mới thành công khách hàng ${code} - ${data.customerName}!`, 'success');
+            }
+          } catch (err: any) {
+            console.error('Error saving customer:', err);
+            showToast('Lỗi khi lưu thông tin khách hàng: ' + (err.message || ''), 'error');
           }
         }}
       />
