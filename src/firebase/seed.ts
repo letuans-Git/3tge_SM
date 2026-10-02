@@ -376,40 +376,34 @@ export const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
 ];
 
 // Helper to seed initial business collections if empty (Customers, Inventory, etc.)
+// Uses local verification flag to avoid blocking startup with 4 sequential network queries.
 export async function seedInitialDatabaseIfEmpty() {
   try {
+    if (typeof window !== 'undefined' && localStorage.getItem('3tge_db_initialized') === 'true') {
+      return;
+    }
+
     const custRef = collection(db, 'customers');
     const custSnap = await getDocs(custRef);
-    if (custSnap.empty) {
-      for (const cust of INITIAL_CUSTOMERS) {
-        await setDoc(doc(db, 'customers', cust.id), cust);
+    if (!custSnap.empty) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('3tge_db_initialized', 'true');
       }
+      return;
     }
 
-    const invRef = collection(db, 'inventory');
-    const invSnap = await getDocs(invRef);
-    if (invSnap.empty) {
-      for (const item of INITIAL_INVENTORY) {
-        await setDoc(doc(db, 'inventory', item.id), item);
-      }
-    }
+    // Only seeds if database is completely empty
+    await Promise.all([
+      ...INITIAL_CUSTOMERS.map(cust => setDoc(doc(db, 'customers', cust.id), cust)),
+      ...INITIAL_INVENTORY.map(item => setDoc(doc(db, 'inventory', item.id), item)),
+      ...INITIAL_CASH_TRANSACTIONS.map(cash => setDoc(doc(db, 'cashTransactions', cash.id), cash)),
+      ...INITIAL_MAINTENANCE.map(m => setDoc(doc(db, 'maintenanceRecords', m.id), m))
+    ]);
 
-    const cashRef = collection(db, 'cashTransactions');
-    const cashSnap = await getDocs(cashRef);
-    if (cashSnap.empty) {
-      for (const cash of INITIAL_CASH_TRANSACTIONS) {
-        await setDoc(doc(db, 'cashTransactions', cash.id), cash);
-      }
-    }
-
-    const maintRef = collection(db, 'maintenanceRecords');
-    const maintSnap = await getDocs(maintRef);
-    if (maintSnap.empty) {
-      for (const m of INITIAL_MAINTENANCE) {
-        await setDoc(doc(db, 'maintenanceRecords', m.id), m);
-      }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('3tge_db_initialized', 'true');
     }
   } catch (error) {
-    console.warn('Initial seeding note (will use local fallback or write once connection allows):', error);
+    console.warn('Initial seeding note:', error);
   }
 }

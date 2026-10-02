@@ -64,8 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
         setRoleDefinitions(loaded);
-      } else {
-        // Initialize default roles in firestore
+        try {
+          localStorage.setItem('3tge_roles_seeded', 'true');
+        } catch {
+          // ignore
+        }
+      } else if (typeof window !== 'undefined' && localStorage.getItem('3tge_roles_seeded') !== 'true') {
+        // Initialize default roles in firestore once
         Object.entries(SYSTEM_ROLE_DEFINITIONS).forEach(async ([roleKey, def]) => {
           try {
             await setDoc(doc(db, 'system_roles', roleKey), {
@@ -77,6 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.warn('Initial role seed note:', e);
           }
         });
+        try {
+          localStorage.setItem('3tge_roles_seeded', 'true');
+        } catch {
+          // ignore
+        }
       }
     }, (err) => {
       console.warn('system_roles listener warning:', err);

@@ -20,259 +20,84 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
-  const [isPrinting, setIsPrinting] = useState(false);
-
   if (!isOpen || !record) return null;
 
-  const handlePrint = async () => {
-    if (!printRef.current) return;
-    setIsPrinting(true);
+  // Helper to generate crisp A4 PDF using the exact preview sheet DOM
+  const generatePDFBlob = async (): Promise<{ pdf: jsPDF; filename: string }> => {
+    if (!printRef.current) throw new Error('Preview element not found');
+    const element = printRef.current;
+
+    // Temporarily scroll container to top to guarantee zero scroll distortion
+    const parentContainer = element.parentElement;
+    const previousScrollTop = parentContainer?.scrollTop || 0;
+    if (parentContainer) {
+      parentContainer.scrollTop = 0;
+    }
 
     try {
-      const element = printRef.current;
-
-      // 1. Temporarily clone the sheet into an isolated offscreen container with pure standard CSS
-      const offscreenContainer = document.createElement('div');
-      offscreenContainer.style.position = 'fixed';
-      offscreenContainer.style.left = '-9999px';
-      offscreenContainer.style.top = '0';
-      offscreenContainer.style.width = '210mm';
-      offscreenContainer.style.height = '297mm';
-      offscreenContainer.style.backgroundColor = '#ffffff';
-      offscreenContainer.style.zIndex = '-9999';
-
-      const cloned = element.cloneNode(true) as HTMLElement;
-      cloned.style.width = '210mm';
-      cloned.style.height = '297mm';
-      cloned.style.margin = '0';
-      cloned.style.boxShadow = 'none';
-      cloned.style.transform = 'none';
-
-      offscreenContainer.appendChild(cloned);
-      document.body.appendChild(offscreenContainer);
-
-      // 2. Render high resolution canvas (scale 2) identical 100% to PDF output
-      const canvas = await html2canvas(cloned, {
-        scale: 2,
+      // Render high-resolution canvas directly from the preview sheet DOM element
+      const canvas = await html2canvas(element, {
+        scale: 3, // High resolution (300 DPI print quality) for crystal clear Vietnamese text
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        width: cloned.offsetWidth,
-        height: cloned.offsetHeight,
+        width: element.offsetWidth,
+        height: element.offsetHeight,
         scrollX: 0,
         scrollY: 0,
         onclone: (clonedDoc) => {
-          const styleTags = clonedDoc.querySelectorAll('style');
-          styleTags.forEach((tag) => {
-            try {
-              if (tag.textContent && tag.textContent.includes('oklch')) {
-                tag.textContent = tag.textContent.replace(/oklch\([^)]+\)/g, '#0f172a');
-              }
-            } catch {
-              // ignore
-            }
-          });
+          const clonedSheet = clonedDoc.getElementById('print-a4-sheet');
+          if (clonedSheet) {
+            clonedSheet.style.boxShadow = 'none';
+            clonedSheet.style.margin = '0';
+            clonedSheet.style.transform = 'none';
+          }
         }
       });
 
-      document.body.removeChild(offscreenContainer);
+      // Generate lossless PNG data URL to ensure razor-sharp text and borders
+      const imgData = canvas.toDataURL('image/png');
 
-      // 3. Create exact A4 PDF
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
         compress: true
       });
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
 
-      // 4. Trigger print via PDF Blob URL
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
+      // Exact A4 dimensions: 210mm x 297mm
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+      const filename = `PhieuBaoDuong_${record.maintenanceCode}.pdf`;
 
-      // Method A: Hidden iframe pointing directly to the PDF Blob URL with auto print
-      const printIframe = document.createElement('iframe');
-      printIframe.style.position = 'fixed';
-      printIframe.style.right = '0';
-      printIframe.style.bottom = '0';
-      printIframe.style.width = '0';
-      printIframe.style.height = '0';
-      printIframe.style.border = '0';
-      printIframe.src = blobUrl;
-      document.body.appendChild(printIframe);
-
-      let printTriggered = false;
-
-      const finishAndClean = () => {
-        setIsPrinting(false);
-        setTimeout(() => {
-          if (document.body.contains(printIframe)) {
-            document.body.removeChild(printIframe);
-          }
-          URL.revokeObjectURL(blobUrl);
-        }, 60000);
-      };
-
-      printIframe.onload = () => {
-        try {
-          printIframe.contentWindow?.focus();
-          printIframe.contentWindow?.print();
-          printTriggered = true;
-          finishAndClean();
-        } catch {
-          // If browser restricts iframe printing of PDF blob (common in Chrome iframe sandboxes)
-          tryDirectPrint();
-        }
-      };
-
-      const tryDirectPrint = () => {
-        if (printTriggered) return;
-        printTriggered = true;
-
-        // Method B: Open PDF Blob in a new tab/window which has full browser print dialog permissions
-        const printWindow = window.open(blobUrl, '_blank');
-        if (printWindow) {
-          printWindow.focus();
-          // Prompt print in new window
-          setTimeout(() => {
-            try {
-              printWindow.print();
-            } catch {
-              // ignore
-            }
-          }, 600);
-          finishAndClean();
-        } else {
-          // Method C: If popups are blocked by browser, trigger native window.print() of current DOM
-          try {
-            window.print();
-          } catch {
-            // Method D: If window.print fails, auto trigger download
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = `PhieuBaoDuong_${record.maintenanceCode}.pdf`;
-            link.click();
-          }
-          finishAndClean();
-        }
-      };
-
-      // Fallback timer if onload doesn't fire within 800ms
-      setTimeout(() => {
-        if (!printTriggered) {
-          tryDirectPrint();
-        }
-      }, 900);
-
-    } catch (err) {
-      console.error('Print generation error:', err);
-      try {
-        window.print();
-      } catch {
-        // Direct jsPDF fallback save
+      return { pdf, filename };
+    } finally {
+      if (parentContainer) {
+        parentContainer.scrollTop = previousScrollTop;
       }
-      setIsPrinting(false);
     }
   };
 
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
     setIsExporting(true);
+    setDownloadSuccess('Đang xuất tệp PDF...');
 
     try {
-      const element = printRef.current;
-
-      // 1. Temporarily clone the sheet into an isolated offscreen container with pure standard CSS
-      // This completely decouples it from modal scroll, Tailwind v4 OKLCH stylesheet variables, and viewport scale.
-      const offscreenContainer = document.createElement('div');
-      offscreenContainer.style.position = 'fixed';
-      offscreenContainer.style.left = '-9999px';
-      offscreenContainer.style.top = '0';
-      offscreenContainer.style.width = '210mm';
-      offscreenContainer.style.height = '297mm';
-      offscreenContainer.style.backgroundColor = '#ffffff';
-      offscreenContainer.style.zIndex = '-9999';
-
-      const cloned = element.cloneNode(true) as HTMLElement;
-      cloned.style.width = '210mm';
-      cloned.style.height = '297mm';
-      cloned.style.margin = '0';
-      cloned.style.boxShadow = 'none';
-      cloned.style.transform = 'none';
-
-      offscreenContainer.appendChild(cloned);
-      document.body.appendChild(offscreenContainer);
-
-      // 2. Render cloned sheet with html2canvas at scale 2 for crisp vector-like text
-      const canvas = await html2canvas(cloned, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: cloned.offsetWidth,
-        height: cloned.offsetHeight,
-        scrollX: 0,
-        scrollY: 0,
-        onclone: (clonedDoc) => {
-          // Remove all stylesheets with oklch to avoid parsing errors
-          const styleTags = clonedDoc.querySelectorAll('style');
-          styleTags.forEach((tag) => {
-            try {
-              if (tag.textContent && tag.textContent.includes('oklch')) {
-                tag.textContent = tag.textContent.replace(/oklch\([^)]+\)/g, '#0f172a');
-              }
-            } catch {
-              // ignore
-            }
-          });
-        }
-      });
-
-      // Clean up offscreen node
-      document.body.removeChild(offscreenContainer);
-
-      // 3. Create high-resolution PDF with exact A4 dimensions
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-
-      // 4. Download file safely
-      const filename = `PhieuBaoDuong_${record.maintenanceCode}.pdf`;
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-
-      setTimeout(() => {
-        if (document.body.contains(link)) {
-          document.body.removeChild(link);
-        }
-        URL.revokeObjectURL(blobUrl);
-      }, 1000);
-
+      const { pdf, filename } = await generatePDFBlob();
+      pdf.save(filename);
       setDownloadSuccess('Đã tải thành công tệp PDF!');
       setTimeout(() => setDownloadSuccess(null), 3500);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      // Direct jsPDF fallback save
       try {
         const doc = new jsPDF();
         doc.text(`Phieu Bao Duong - ${record.maintenanceCode}`, 20, 20);
         doc.save(`PhieuBaoDuong_${record.maintenanceCode}.pdf`);
+        setDownloadSuccess('Đã tải tệp PDF dự phòng!');
+        setTimeout(() => setDownloadSuccess(null), 3500);
       } catch {
-        window.print();
+        setDownloadSuccess('Lỗi khi xuất PDF. Vui lòng thử lại!');
+        setTimeout(() => setDownloadSuccess(null), 3500);
       }
     } finally {
       setIsExporting(false);
@@ -477,24 +302,16 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
               </span>
             )}
             <button
-              onClick={handlePrint}
-              disabled={isPrinting || isExporting}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition active:scale-95"
-            >
-              <Printer className="w-4 h-4" />
-              {isPrinting ? 'Đang mở máy in...' : 'In Ngay'}
-            </button>
-            <button
               onClick={handleDownloadPDF}
               disabled={isExporting}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition active:scale-95"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               {isExporting ? 'Đang xuất PDF...' : 'Tải File PDF'}
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

@@ -72,7 +72,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Explicit fetch function to guarantee fresh retrieval directly from Firestore
   const refreshData = async () => {
     try {
-      setIsLoading(true);
       const [custSnap, invSnap, invTransSnap, cashSnap, maintSnap, notifSnap] = await Promise.all([
         getDocs(collection(db, 'customers')),
         getDocs(collection(db, 'inventory')),
@@ -110,8 +109,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsOnline(true);
     } catch (err) {
       console.warn('Direct refresh from Firestore:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -229,8 +226,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Saved in offline/local state:', e);
     }
 
-    // Auto-refresh immediately from database to ensure freshest state
-    await refreshData();
     logActivity('Thêm khách hàng mới', `Tạo khách hàng ${code} - ${newCustomer.customerName}`);
     return code;
   };
@@ -258,8 +253,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Updated in local state:', e);
     }
 
-    // Auto-refresh immediately from database after updating
-    await refreshData();
     logActivity('Cập nhật khách hàng', `Chỉnh sửa thông tin hồ sơ ID ${id}`);
   };
 
@@ -279,8 +272,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Updated in local state:', e);
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     if (target) {
       logActivity('Vô hiệu hóa khách hàng', `Vô hiệu hóa hồ sơ ${target.customerCode} - ${target.customerName}${reason ? ` (Lý do: ${reason})` : ''}`);
     }
@@ -302,8 +293,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Restored in local state:', e);
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     if (target) {
       logActivity('Khôi phục khách hàng', `Kích hoạt lại hồ sơ ${target.customerCode} - ${target.customerName}`);
     }
@@ -324,8 +313,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Deleted locally:', e);
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Xóa vĩnh viễn khách hàng', `Xóa vĩnh viễn hồ sơ đã vô hiệu hóa ${target.customerCode} - ${target.customerName}`);
   };
 
@@ -361,8 +348,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Lập phiếu bảo dưỡng', `Phiếu ${recordData.maintenanceCode} cho ${recordData.customerName} (+180 ngày kỳ tiếp theo: ${nextFormatted})`);
   };
 
@@ -394,8 +379,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Cập nhật phiếu bảo dưỡng', `Chỉnh sửa phiếu ${updates.maintenanceCode || current?.maintenanceCode || id}`);
   };
 
@@ -406,8 +389,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Deleted maintenance locally:', e);
     }
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Xóa phiếu bảo dưỡng', `Xóa phiếu bảo dưỡng ${target?.maintenanceCode || id} (${target?.customerName || ''})`);
   };
 
@@ -419,8 +400,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Item stored locally:', e);
     }
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Thêm vật tư mới', `Tạo vật tư [${item.code}] ${item.name}`);
   };
 
@@ -430,8 +409,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Item updated locally:', e);
     }
-    // Auto-refresh immediately from database
-    await refreshData();
   };
 
   const recordInventoryTransaction = async (transData: Omit<InventoryTransaction, 'id' | 'transactionCode'>) => {
@@ -459,8 +436,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Transaction stored locally:', e);
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Giao dịch kho', `${transData.type === 'IN' ? 'Nhập kho' : 'Xuất kho'} ${transData.quantity} ${targetItem?.unit || ''} [${transData.itemCode}]`);
   };
 
@@ -482,8 +457,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Cash saved locally:', e);
     }
 
-    // Auto-refresh immediately from database
-    await refreshData();
     logActivity('Lập phiếu quỹ', `${trans.type === 'THU' ? 'Thu tiền' : 'Chi tiền'} ${trans.amount.toLocaleString('vi-VN')} đ - ${trans.category}`);
   };
 
@@ -493,8 +466,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Deleted locally:', e);
     }
-    // Auto-refresh immediately from database
-    await refreshData();
   };
 
   // Dispatch maintenance alerts via multi-channels
