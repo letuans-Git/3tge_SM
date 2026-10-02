@@ -1,0 +1,6 @@
+{
+  "name": "3TGE Solar Management",
+  "description": "Hệ thống quản lý khách hàng, bảo trì năng lượng mặt trời, kho vật tư xuất nhập tồn và thu chi quỹ chuyên nghiệp 3TGE Solar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

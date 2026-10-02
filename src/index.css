@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* Đảm bảo toàn bộ chữ trong tất cả các form hiển thị màu đen rõ nét */
+form label,
+form h3,
+form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+form select,
+form textarea {
+  color: #000000;
+}
+
+form input::placeholder,
+form textarea::placeholder {
+  color: #64748b;
+}
