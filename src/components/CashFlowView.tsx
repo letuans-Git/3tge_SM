@@ -18,6 +18,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { exportCashFlowToExcel } from '../utils/exportUtils';
 import { formatDateVN } from '../utils/dateUtils';
+import { SolarLogo } from './SolarLogo';
 
 const THU_CATEGORIES: CashFlowCategory[] = [
   'Thu tiền hợp đồng',
@@ -104,16 +105,22 @@ export const CashFlowView: React.FC = () => {
     <div className="space-y-4">
       {/* Top Header Card */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-slate-800">Quản Lý Thu - Chi & Quỹ Tiền Mặt</h2>
-            <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-              Sổ quỹ 3TGE
-            </span>
+        <div className="flex items-center gap-3.5">
+          <SolarLogo 
+            className="w-14 h-14 shrink-0 shadow-sm" 
+            allowUpload={true}
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-800">Quản Lý Thu - Chi & Quỹ Tiền Mặt</h2>
+              <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                Sổ quỹ 3TGE
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Theo dõi dòng tiền thu hợp đồng solar, chi phí thiết bị, công tác phí và bảo dưỡng
+            </p>
           </div>
-          <p className="text-xs text-slate-500">
-            Theo dõi dòng tiền thu hợp đồng solar, chi phí thiết bị, công tác phí và bảo dưỡng
-          </p>
         </div>
 
         <div className="flex items-center gap-2">

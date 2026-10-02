@@ -269,57 +269,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab }) => {
         </div>
       </div>
 
-      {/* Secondary Quick Metrics: Warranty & Cash & Inventory */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+      {/* Secondary Quick Metrics: Warranty */}
+      <div>
         {/* Warranty Card */}
-        <div className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <div className="text-[11px] font-semibold text-slate-500">Tình trạng bảo hành</div>
-            <div className="flex items-center gap-1.5 mt-0.5 leading-tight">
-              <span className="text-base font-extrabold text-blue-700">{inWarrantySystems} Còn BH</span>
-              <span className="text-xs text-slate-400">|</span>
-              <span className="text-xs font-bold text-rose-600">{expiredWarrantySystems} Hết BH</span>
+        <div className="bg-white px-3 py-2.5 rounded-lg border border-slate-200 shadow-2xs flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">Tình trạng bảo hành toàn hệ thống</div>
+              <div className="flex items-center gap-2 mt-0.5 leading-tight">
+                <span className="text-base font-extrabold text-blue-700">{inWarrantySystems} trạm Còn hạn bảo hành</span>
+                <span className="text-xs text-slate-400">|</span>
+                <span className="text-xs font-bold text-rose-600">{expiredWarrantySystems} trạm Đã hết hạn</span>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Cash Fund Balance Card */}
-        <div 
-          onClick={() => onNavigateToTab('cashflow')}
-          className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs flex items-center gap-2.5 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <div className="text-[11px] font-semibold text-slate-500">Quỹ tiền mặt & Ngân hàng</div>
-            <div className="text-base font-extrabold text-emerald-700 leading-tight">
-              {fundBalance.toLocaleString('vi-VN')} <span className="text-xs font-semibold text-slate-500">đ</span>
-            </div>
-            <div className="text-[9.5px] text-slate-400">Thu: {(totalThu/1e6).toFixed(1)}M • Chi: {(totalChi/1e6).toFixed(1)}M</div>
-          </div>
-        </div>
-
-        {/* Inventory low stock */}
-        <div 
-          onClick={() => onNavigateToTab('inventory')}
-          className="bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs flex items-center gap-2.5 cursor-pointer hover:shadow-xs transition"
-        >
-          <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
-            <Boxes className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <div className="text-[11px] font-semibold text-slate-500">Tồn kho vật tư & Thiết bị</div>
-            <div className="text-base font-extrabold text-slate-800 leading-tight">
-              {inventory.length} <span className="text-xs font-normal text-slate-500">mã vật tư</span>
-            </div>
-            <div className="text-[9.5px] text-amber-600 font-semibold">
-              {lowStockItems > 0 ? `⚠️ ${lowStockItems} mặt hàng chạm ngưỡng tồn tối thiểu` : 'Đầy đủ vật tư dự phòng'}
-            </div>
-          </div>
+          <button
+            onClick={() => onNavigateToTab('customers')}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1"
+          >
+            Chi tiết hợp đồng →
+          </button>
         </div>
       </div>
 

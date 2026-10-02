@@ -18,7 +18,6 @@ import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { PermissionAction } from '../types/permissions';
 import { UserManagementModal } from './UserManagementModal';
-import { SolarLogo } from './SolarLogo';
 
 export type NavTab = 'dashboard' | 'customers' | 'maintenance' | 'inventory' | 'cashflow' | 'reports';
 
@@ -76,10 +75,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => onSelectTab('dashboard')} 
                 className="flex items-center gap-2.5 cursor-pointer group"
               >
-                <SolarLogo 
-                  className="w-[54px] h-[54px] group-hover:scale-105 transition-transform" 
-                  allowUpload={true}
-                />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-extrabold text-xl tracking-tight bg-linear-to-r from-emerald-700 via-teal-700 to-cyan-700 bg-clip-text text-transparent">
