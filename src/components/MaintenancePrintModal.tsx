@@ -282,25 +282,30 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
   // Sub-component representing 1 copy (Half of A4)
   const renderTicketCopy = (_copyTitle: string, badgeText: string) => (
     <div 
-      className="p-5 flex flex-col justify-between box-border"
+      className="flex flex-col justify-between box-border"
       style={{
         fontFamily: '"Times New Roman", Times, Georgia, serif',
         height: '141mm',
         maxHeight: '141mm',
         overflow: 'hidden',
         color: '#0f172a',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        paddingLeft: '20mm',   // Lề trái 20mm tiêu chuẩn lưu trữ hồ sơ / bấm kim
+        paddingRight: '12mm',  // Lề phải 12mm
+        paddingTop: '5mm',     // Lề trên 5mm
+        paddingBottom: '5mm',  // Lề dưới 5mm
+        boxSizing: 'border-box'
       }}
     >
       {/* Top Header */}
       <div>
         <div 
-          className="flex items-start justify-between pb-1.5 mb-2"
+          className="flex items-start justify-between pb-1 mb-1.5"
           style={{ borderBottom: '2px solid #065f46' }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <div 
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-xs text-center leading-none"
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-[11px] text-center leading-none"
               style={{
                 border: '1.5px solid #047857',
                 color: '#065f46',
@@ -311,19 +316,19 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
             </div>
             <div>
               <h1 
-                className="text-sm font-bold tracking-wide uppercase leading-tight"
+                className="text-[13px] font-bold tracking-wide uppercase leading-tight"
                 style={{ color: '#064e3b' }}
               >
                 CÔNG TY TNHH NĂNG LƯỢNG XANH 3TGE
               </h1>
-              <p className="text-[10px] font-semibold tracking-normal leading-tight" style={{ color: '#475569' }}>
+              <p className="text-[9.5px] font-semibold tracking-normal leading-tight" style={{ color: '#475569' }}>
                 3T Green Energy • Hotline Kỹ Thuật: <span className="font-bold" style={{ color: '#065f46' }}>0913.566.532</span>
               </p>
             </div>
           </div>
           <div className="text-right">
             <span 
-              className="inline-block px-2 py-0.5 text-[9.5px] font-bold uppercase rounded leading-tight"
+              className="inline-block px-2 py-0.5 text-[9px] font-bold uppercase rounded leading-tight"
               style={{
                 border: '1px solid #065f46',
                 backgroundColor: '#ecfdf5',
@@ -332,25 +337,25 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
             >
               {badgeText}
             </span>
-            <p className="text-[10px] font-mono font-bold mt-0.5" style={{ color: '#334155' }}>
+            <p className="text-[9.5px] font-mono font-bold mt-0.5" style={{ color: '#334155' }}>
               Số: {record.maintenanceCode}
             </p>
           </div>
         </div>
 
         {/* Title */}
-        <div className="text-center my-1.5">
-          <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: '#0f172a' }}>
+        <div className="text-center my-1">
+          <h2 className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#0f172a' }}>
             BIÊN BẢN KIỂM TRA & PHIẾU BẢO DƯỠNG ĐỊNH KỲ
           </h2>
-          <p className="text-[10.5px] italic" style={{ color: '#475569' }}>
+          <p className="text-[10px] italic" style={{ color: '#475569' }}>
             (Hệ thống điện năng lượng mặt trời áp mái)
           </p>
         </div>
 
         {/* Customer & Maintenance Info */}
         <div 
-          className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-2 p-2 rounded"
+          className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] mb-1.5 p-1.5 rounded"
           style={{
             backgroundColor: '#f8fafc',
             border: '1px solid #cbd5e1',
@@ -376,49 +381,49 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
         </div>
 
         {/* Work Content & Result Details */}
-        <div className="space-y-1 text-xs" style={{ color: '#0f172a' }}>
+        <div className="space-y-1 text-[11px]" style={{ color: '#0f172a' }}>
           <div 
-            className="rounded p-1.5"
+            className="rounded p-1"
             style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}
           >
             <div 
-              className="font-bold text-[11px] uppercase mb-0.5"
+              className="font-bold text-[10.5px] uppercase mb-0.5"
               style={{ color: '#065f46' }}
             >
               1. Nội dung công việc bảo dưỡng thực hiện:
             </div>
-            <div className="text-[11.5px] pl-2 leading-snug" style={{ color: '#1e293b' }}>
+            <div className="text-[11px] pl-2 leading-snug" style={{ color: '#1e293b' }}>
               {record.content || 'Kiểm tra siết bu lông, vệ sinh dàn pin, kiểm tra biến tần & tiếp địa.'}
             </div>
           </div>
 
           <div 
-            className="rounded p-1.5"
+            className="rounded p-1"
             style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}
           >
             <div 
-              className="font-bold text-[11px] uppercase mb-0.5"
+              className="font-bold text-[10.5px] uppercase mb-0.5"
               style={{ color: '#065f46' }}
             >
               2. Kết quả kiểm tra thông số kỹ thuật & vận hành:
             </div>
-            <div className="text-[11.5px] pl-2 leading-snug" style={{ color: '#1e293b' }}>
+            <div className="text-[11px] pl-2 leading-snug" style={{ color: '#1e293b' }}>
               {record.inspectionResult || 'Hệ thống hòa lưới ổn định, điện áp DC & AC đạt chuẩn.'}
             </div>
           </div>
 
           {record.recommendations && (
             <div 
-              className="rounded p-1.5"
+              className="rounded p-1"
               style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}
             >
               <div 
-                className="font-bold text-[11px] uppercase mb-0.5"
+                className="font-bold text-[10.5px] uppercase mb-0.5"
                 style={{ color: '#065f46' }}
               >
                 3. Khuyến nghị & hướng dẫn vận hành:
               </div>
-              <div className="text-[11.5px] pl-2 italic leading-snug" style={{ color: '#1e293b' }}>
+              <div className="text-[11px] pl-2 italic leading-snug" style={{ color: '#1e293b' }}>
                 {record.recommendations}
               </div>
             </div>
@@ -428,20 +433,20 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
 
       {/* Footer next schedule & signatures */}
       <div className="mt-1 pt-1" style={{ borderTop: '1px solid #e2e8f0' }}>
-        <div className="text-[11px] font-bold mb-2" style={{ color: '#b91c1c' }}>
+        <div className="text-[10.5px] font-bold mb-1" style={{ color: '#b91c1c' }}>
           * Thời gian đến kỳ kiểm tra & bảo dưỡng định kỳ tiếp theo (+180 ngày): {formatDateVN(record.nextScheduledDate)}
         </div>
 
-        <div className="grid grid-cols-2 text-center text-xs pb-1" style={{ color: '#0f172a' }}>
+        <div className="grid grid-cols-2 text-center text-[11px] pb-0.5" style={{ color: '#0f172a' }}>
           <div>
-            <div className="font-bold uppercase text-[11px]">ĐẠI DIỆN KHÁCH HÀNG</div>
-            <div className="text-[10px] italic mb-8" style={{ color: '#64748b' }}>(Ký và ghi rõ họ tên)</div>
-            <div className="font-semibold text-xs" style={{ color: '#0f172a' }}>{record.customerName}</div>
+            <div className="font-bold uppercase text-[10.5px]">ĐẠI DIỆN KHÁCH HÀNG</div>
+            <div className="text-[9.5px] italic mb-6" style={{ color: '#64748b' }}>(Ký và ghi rõ họ tên)</div>
+            <div className="font-semibold text-[11px]" style={{ color: '#0f172a' }}>{record.customerName}</div>
           </div>
           <div>
-            <div className="font-bold uppercase text-[11px]">KỸ THUẬT VIÊN 3TGE</div>
-            <div className="text-[10px] italic mb-8" style={{ color: '#64748b' }}>(Ký và xác nhận)</div>
-            <div className="font-semibold text-xs" style={{ color: '#0f172a' }}>{record.technicianName}</div>
+            <div className="font-bold uppercase text-[10.5px]">KỸ THUẬT VIÊN 3TGE</div>
+            <div className="text-[9.5px] italic mb-6" style={{ color: '#64748b' }}>(Ký và xác nhận)</div>
+            <div className="font-semibold text-[11px]" style={{ color: '#0f172a' }}>{record.technicianName}</div>
           </div>
         </div>
       </div>

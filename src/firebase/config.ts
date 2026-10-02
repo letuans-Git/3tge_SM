@@ -1,9 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getFirestore, 
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager
+  memoryLocalCache
 } from 'firebase/firestore';
 
 // In case firebase-applet-config.json exists
@@ -28,10 +26,11 @@ try {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+// Use memoryLocalCache to guarantee that every time the app is loaded,
+// all data is fetched directly and freshly from the database server,
+// preventing stale persistent cache.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
+  localCache: memoryLocalCache()
 }, 'ai-studio-f2e1b78c-7adf-4b28-86ee-1e9983fb930d');
 
 export default app;

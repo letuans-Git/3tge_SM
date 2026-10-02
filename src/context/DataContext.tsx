@@ -32,6 +32,7 @@ interface DataContextType {
   activityLogs: ActivityLog[];
   isLoading: boolean;
   isOnline: boolean;
+  refreshData: () => Promise<void>;
   addCustomer: (cust: Omit<Customer, 'id' | 'customerCode' | 'createdAt' | 'updatedAt' | 'totalCapacityKW'>) => Promise<string>;
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
   disableCustomer: (id: string, reason?: string) => Promise<void>;
@@ -57,79 +58,114 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  // Start with empty arrays to guarantee only live data from Firestore database is displayed
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
-  const [cashTransactions, setCashTransactions] = useState<CashTransaction[]>(INITIAL_CASH_TRANSACTIONS);
-  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(INITIAL_MAINTENANCE);
+  const [cashTransactions, setCashTransactions] = useState<CashTransaction[]>([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
   const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
 
-  // Initial boot and Firebase listeners
+  // Explicit fetch function to guarantee fresh retrieval directly from Firestore
+  const refreshData = async () => {
+    try {
+      setIsLoading(true);
+      const [custSnap, invSnap, invTransSnap, cashSnap, maintSnap, notifSnap] = await Promise.all([
+        getDocs(collection(db, 'customers')),
+        getDocs(collection(db, 'inventory')),
+        getDocs(collection(db, 'inventoryTransactions')),
+        getDocs(collection(db, 'cashTransactions')),
+        getDocs(collection(db, 'maintenanceRecords')),
+        getDocs(collection(db, 'notificationLogs'))
+      ]);
+
+      const custList: Customer[] = [];
+      custSnap.forEach((d) => custList.push({ ...d.data(), id: d.id } as Customer));
+      custList.sort((a, b) => (b.customerCode || '').localeCompare(a.customerCode || ''));
+      setCustomers(custList);
+
+      const invList: InventoryItem[] = [];
+      invSnap.forEach((d) => invList.push({ ...d.data(), id: d.id } as InventoryItem));
+      setInventory(invList);
+
+      const invTransList: InventoryTransaction[] = [];
+      invTransSnap.forEach((d) => invTransList.push({ ...d.data(), id: d.id } as InventoryTransaction));
+      setInventoryTransactions(invTransList.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+
+      const cashList: CashTransaction[] = [];
+      cashSnap.forEach((d) => cashList.push({ ...d.data(), id: d.id } as CashTransaction));
+      setCashTransactions(cashList.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
+
+      const maintList: MaintenanceRecord[] = [];
+      maintSnap.forEach((d) => maintList.push({ ...d.data(), id: d.id } as MaintenanceRecord));
+      setMaintenanceRecords(maintList.sort((a, b) => (b.maintenanceDate || '').localeCompare(a.maintenanceDate || '')));
+
+      const notifList: NotificationLog[] = [];
+      notifSnap.forEach((d) => notifList.push({ ...d.data(), id: d.id } as NotificationLog));
+      setNotificationLogs(notifList.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || '')));
+
+      setIsOnline(true);
+    } catch (err) {
+      console.warn('Direct refresh from Firestore:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial boot and real-time database listeners
   useEffect(() => {
     seedInitialDatabaseIfEmpty();
 
-    // Listen to customers
+    // Listen to customers in real time
     const unsubCust = onSnapshot(collection(db, 'customers'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: Customer[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Customer));
-        // Sort by customerCode desc
-        list.sort((a, b) => b.customerCode.localeCompare(a.customerCode));
-        setCustomers(list);
-      }
+      const list: Customer[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Customer));
+      list.sort((a, b) => (b.customerCode || '').localeCompare(a.customerCode || ''));
+      setCustomers(list);
       setIsLoading(false);
+      setIsOnline(true);
     }, (error) => {
-      console.warn('Firestore fallback mode active:', error);
+      console.warn('Firestore live sync note:', error);
       setIsLoading(false);
       setIsOnline(false);
     });
 
-    // Listen to inventory
+    // Listen to inventory in real time
     const unsubInv = onSnapshot(collection(db, 'inventory'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: InventoryItem[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as InventoryItem));
-        setInventory(list);
-      }
+      const list: InventoryItem[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as InventoryItem));
+      setInventory(list);
     }, () => {});
 
-    // Listen to inventory transactions
+    // Listen to inventory transactions in real time
     const unsubInvTrans = onSnapshot(collection(db, 'inventoryTransactions'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: InventoryTransaction[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as InventoryTransaction));
-        setInventoryTransactions(list.sort((a, b) => b.date.localeCompare(a.date)));
-      }
+      const list: InventoryTransaction[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as InventoryTransaction));
+      setInventoryTransactions(list.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     }, () => {});
 
-    // Listen to cash transactions
+    // Listen to cash transactions in real time
     const unsubCash = onSnapshot(collection(db, 'cashTransactions'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: CashTransaction[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as CashTransaction));
-        setCashTransactions(list.sort((a, b) => b.date.localeCompare(a.date)));
-      }
+      const list: CashTransaction[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as CashTransaction));
+      setCashTransactions(list.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     }, () => {});
 
-    // Listen to maintenance records
+    // Listen to maintenance records in real time
     const unsubMaint = onSnapshot(collection(db, 'maintenanceRecords'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: MaintenanceRecord[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as MaintenanceRecord));
-        setMaintenanceRecords(list.sort((a, b) => b.maintenanceDate.localeCompare(a.maintenanceDate)));
-      }
+      const list: MaintenanceRecord[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as MaintenanceRecord));
+      setMaintenanceRecords(list.sort((a, b) => (b.maintenanceDate || '').localeCompare(a.maintenanceDate || '')));
     }, () => {});
 
-    // Listen to notification logs
+    // Listen to notification logs in real time
     const unsubNotif = onSnapshot(collection(db, 'notificationLogs'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: NotificationLog[] = [];
-        snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as NotificationLog));
-        setNotificationLogs(list.sort((a, b) => b.sentAt.localeCompare(a.sentAt)));
-      }
+      const list: NotificationLog[] = [];
+      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as NotificationLog));
+      setNotificationLogs(list.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || '')));
     }, () => {});
 
     return () => {
@@ -187,15 +223,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: now
     };
 
-    // Update state immediately for instant UX
-    setCustomers(prev => [newCustomer, ...prev]);
-
     try {
       await setDoc(doc(db, 'customers', id), newCustomer);
     } catch (e) {
       console.warn('Saved in offline/local state:', e);
     }
 
+    // Auto-refresh immediately from database to ensure freshest state
+    await refreshData();
     logActivity('Thêm khách hàng mới', `Tạo khách hàng ${code} - ${newCustomer.customerName}`);
     return code;
   };
@@ -212,18 +247,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalKW = invKW + windKW;
     }
 
-    setCustomers(prev => prev.map(c => {
-      if (c.id === id) {
-        return {
-          ...c,
-          ...updates,
-          totalCapacityKW: totalKW !== undefined ? totalKW : c.totalCapacityKW,
-          updatedAt: now
-        };
-      }
-      return c;
-    }));
-
     try {
       const docRef = doc(db, 'customers', id);
       await updateDoc(docRef, {
@@ -235,6 +258,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Updated in local state:', e);
     }
 
+    // Auto-refresh immediately from database after updating
+    await refreshData();
     logActivity('Cập nhật khách hàng', `Chỉnh sửa thông tin hồ sơ ID ${id}`);
   };
 
@@ -248,14 +273,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: now
     };
 
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-
     try {
       await updateDoc(doc(db, 'customers', id), updates);
     } catch (e) {
       console.warn('Updated in local state:', e);
     }
 
+    // Auto-refresh immediately from database
+    await refreshData();
     if (target) {
       logActivity('Vô hiệu hóa khách hàng', `Vô hiệu hóa hồ sơ ${target.customerCode} - ${target.customerName}${reason ? ` (Lý do: ${reason})` : ''}`);
     }
@@ -271,14 +296,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: now
     };
 
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-
     try {
       await updateDoc(doc(db, 'customers', id), updates);
     } catch (e) {
       console.warn('Restored in local state:', e);
     }
 
+    // Auto-refresh immediately from database
+    await refreshData();
     if (target) {
       logActivity('Khôi phục khách hàng', `Kích hoạt lại hồ sơ ${target.customerCode} - ${target.customerName}`);
     }
@@ -293,12 +318,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Chỉ được phép xóa khách hàng sau khi đã vô hiệu hóa hồ sơ!');
     }
 
-    setCustomers(prev => prev.filter(c => c.id !== id));
     try {
       await deleteDoc(doc(db, 'customers', id));
     } catch (e) {
       console.warn('Deleted locally:', e);
     }
+
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Xóa vĩnh viễn khách hàng', `Xóa vĩnh viễn hồ sơ đã vô hiệu hóa ${target.customerCode} - ${target.customerName}`);
   };
 
@@ -320,8 +347,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: now
     };
 
-    setMaintenanceRecords(prev => [fullRecord, ...prev]);
-
     try {
       await setDoc(doc(db, 'maintenanceRecords', id), fullRecord);
     } catch (e) {
@@ -336,6 +361,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Lập phiếu bảo dưỡng', `Phiếu ${recordData.maintenanceCode} cho ${recordData.customerName} (+180 ngày kỳ tiếp theo: ${nextFormatted})`);
   };
 
@@ -353,8 +380,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...(nextFormatted ? { nextScheduledDate: nextFormatted } : {})
     };
 
-    setMaintenanceRecords(prev => prev.map(r => r.id === id ? { ...r, ...payload } : r));
-
     try {
       const docRef = doc(db, 'maintenanceRecords', id);
       await updateDoc(docRef, payload);
@@ -369,39 +394,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Cập nhật phiếu bảo dưỡng', `Chỉnh sửa phiếu ${updates.maintenanceCode || current?.maintenanceCode || id}`);
   };
 
   const deleteMaintenanceRecord = async (id: string) => {
     const target = maintenanceRecords.find(r => r.id === id);
-    setMaintenanceRecords(prev => prev.filter(r => r.id !== id));
     try {
       await deleteDoc(doc(db, 'maintenanceRecords', id));
     } catch (e) {
       console.warn('Deleted maintenance locally:', e);
     }
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Xóa phiếu bảo dưỡng', `Xóa phiếu bảo dưỡng ${target?.maintenanceCode || id} (${target?.customerName || ''})`);
   };
 
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
     const id = `item_${Date.now()}`;
     const newItem: InventoryItem = { ...item, id };
-    setInventory(prev => [...prev, newItem]);
     try {
       await setDoc(doc(db, 'inventory', id), newItem);
     } catch (e) {
       console.warn('Item stored locally:', e);
     }
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Thêm vật tư mới', `Tạo vật tư [${item.code}] ${item.name}`);
   };
 
   const updateInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
-    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
     try {
       await updateDoc(doc(db, 'inventory', id), updates);
     } catch (e) {
       console.warn('Item updated locally:', e);
     }
+    // Auto-refresh immediately from database
+    await refreshData();
   };
 
   const recordInventoryTransaction = async (transData: Omit<InventoryTransaction, 'id' | 'transactionCode'>) => {
@@ -420,16 +450,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newStock = transData.type === 'IN' 
         ? targetItem.stockQuantity + transData.quantity 
         : Math.max(0, targetItem.stockQuantity - transData.quantity);
-      await updateInventoryItem(targetItem.id, { stockQuantity: newStock });
+      await updateDoc(doc(db, 'inventory', targetItem.id), { stockQuantity: newStock });
     }
 
-    setInventoryTransactions(prev => [fullTrans, ...prev]);
     try {
       await setDoc(doc(db, 'inventoryTransactions', id), fullTrans);
     } catch (e) {
       console.warn('Transaction stored locally:', e);
     }
 
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Giao dịch kho', `${transData.type === 'IN' ? 'Nhập kho' : 'Xuất kho'} ${transData.quantity} ${targetItem?.unit || ''} [${transData.itemCode}]`);
   };
 
@@ -445,22 +476,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: now
     };
 
-    setCashTransactions(prev => [fullCash, ...prev]);
     try {
       await setDoc(doc(db, 'cashTransactions', id), fullCash);
     } catch (e) {
       console.warn('Cash saved locally:', e);
     }
+
+    // Auto-refresh immediately from database
+    await refreshData();
     logActivity('Lập phiếu quỹ', `${trans.type === 'THU' ? 'Thu tiền' : 'Chi tiền'} ${trans.amount.toLocaleString('vi-VN')} đ - ${trans.category}`);
   };
 
   const deleteCashTransaction = async (id: string) => {
-    setCashTransactions(prev => prev.filter(c => c.id !== id));
     try {
       await deleteDoc(doc(db, 'cashTransactions', id));
     } catch (e) {
       console.warn('Deleted locally:', e);
     }
+    // Auto-refresh immediately from database
+    await refreshData();
   };
 
   // Dispatch maintenance alerts via multi-channels
@@ -518,6 +552,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activityLogs,
         isLoading,
         isOnline,
+        refreshData,
         addCustomer,
         updateCustomer,
         disableCustomer,
