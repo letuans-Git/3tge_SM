@@ -15,8 +15,19 @@ import { SolarLogo } from './components/SolarLogo';
 function MainApp() {
   const { currentUser, loadingAuth } = useAuth();
   const { isOnline } = useData();
-  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavTab>('customers');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const prevUserIdRef = React.useRef<string | null>(null);
+
+  // When user signs in or switches accounts, default directly to customer management
+  React.useEffect(() => {
+    if (currentUser?.id && currentUser.id !== prevUserIdRef.current) {
+      setCurrentTab('customers');
+      prevUserIdRef.current = currentUser.id;
+    } else if (!currentUser) {
+      prevUserIdRef.current = null;
+    }
+  }, [currentUser?.id]);
 
   if (loadingAuth) {
     return (
