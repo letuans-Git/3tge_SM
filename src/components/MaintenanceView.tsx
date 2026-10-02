@@ -22,7 +22,7 @@ import { Customer, MaintenanceRecord } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { exportMaintenanceToExcel } from '../utils/exportUtils';
-import { formatDateVN } from '../utils/dateUtils';
+import { formatDateVN, generateMaintenanceCode } from '../utils/dateUtils';
 import { MaintenancePrintModal } from './MaintenancePrintModal';
 
 export const MaintenanceView: React.FC = () => {
@@ -53,6 +53,18 @@ export const MaintenanceView: React.FC = () => {
   const [imageBefore, setImageBefore] = useState('');
   const [imageAfter, setImageAfter] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = React.useRef(false);
+
+  // Strictly deduplicate maintenance records to guarantee 1 unique ticket per creation
+  const displayRecords = React.useMemo(() => {
+    const seen = new Set<string>();
+    return maintenanceRecords.filter(r => {
+      const key = r.id || `${r.maintenanceCode}_${r.customerCode}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [maintenanceRecords]);
 
   // Quick Dispatch Notification modal
   const [notifTarget, setNotifTarget] = useState<Customer | null>(null);
@@ -121,13 +133,15 @@ export const MaintenanceView: React.FC = () => {
 
   const handleOpenCreateRecord = (cust?: Customer) => {
     setEditingRecord(null);
-    if (cust) {
-      setSelectedCustomerId(cust.id);
-    } else if (customers.length > 0) {
-      setSelectedCustomerId(customers[0].id);
+    const targetCust = cust || (customers.length > 0 ? customers[0] : null);
+    if (targetCust) {
+      setSelectedCustomerId(targetCust.id);
+      // Initialize maintenanceDate with customer's current/old scheduled maintenance date (or today if none)
+      setMaintenanceDate(targetCust.nextMaintenanceDate || new Date().toISOString().split('T')[0]);
+    } else {
+      setMaintenanceDate(new Date().toISOString().split('T')[0]);
     }
     setTechnicianName(currentUser?.fullName.split(' - ')[0] || 'Nguyễn Văn Hùng');
-    setMaintenanceDate(new Date().toISOString().split('T')[0]);
     setContent('Kiểm tra biến tần, siết các đầu nối MC4, đo điện áp chuỗi pin PV, vệ sinh tấm pin và lọc gió inverter.');
     setInspectionResult('Hệ thống hoạt động bình thường, điện áp DC và AC ổn định.');
     setRecommendations('Vệ sinh bề mặt tấm pin định kỳ sau 6 tháng. Kiểm tra dây siết bu lông.');
@@ -152,11 +166,15 @@ export const MaintenanceView: React.FC = () => {
 
   const handleCreateRecordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
+
     const cust = customers.find(c => c.id === selectedCustomerId);
     if (!cust) return;
 
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     try {
-      setIsSubmitting(true);
       if (editingRecord) {
         await updateMaintenanceRecord(editingRecord.id, {
           customerId: cust.id,
@@ -171,7 +189,14 @@ export const MaintenanceView: React.FC = () => {
           imageAfter
         });
       } else {
-        const code = `BD-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
+        // Lấy ngày tạo phiếu (thời điểm lập phiếu hôm nay: new Date()) để tạo mã số phiếu:
+        // BD + 2 số ngày + 2 số tháng + 4 số năm + '-' + 2 số thứ tự phiếu
+        const creationDate = new Date();
+        const code = generateMaintenanceCode(creationDate, maintenanceRecords);
+        const d = new Date(maintenanceDate);
+        d.setDate(d.getDate() + 180);
+        const newScheduledDate = d.toISOString().split('T')[0];
+
         await addMaintenanceRecord({
           customerId: cust.id,
           customerCode: cust.customerCode,
@@ -184,7 +209,7 @@ export const MaintenanceView: React.FC = () => {
           recommendations,
           imageBefore,
           imageAfter,
-          nextScheduledDate: '' // Will be auto-calculated to +180 days by context
+          nextScheduledDate: newScheduledDate
         });
       }
 
@@ -193,6 +218,9 @@ export const MaintenanceView: React.FC = () => {
       setActiveSubTab('records');
     } finally {
       setIsSubmitting(false);
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 1000);
     }
   };
 
@@ -288,7 +316,7 @@ export const MaintenanceView: React.FC = () => {
           }`}
         >
           <FileText className="w-4 h-4" />
-          Danh Sách Phiếu Đã Thực Hiện ({maintenanceRecords.length})
+          Danh Sách Phiếu Đã Thực Hiện ({displayRecords.length})
         </button>
       </div>
 
@@ -411,17 +439,22 @@ export const MaintenanceView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {maintenanceRecords.length === 0 ? (
+                {displayRecords.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-6 text-center text-slate-400">
                       Chưa có phiếu bảo dưỡng nào được tạo.
                     </td>
                   </tr>
                 ) : (
-                  maintenanceRecords.map(r => (
+                  displayRecords.map(r => (
                     <tr key={r.id} className="hover:bg-slate-50 transition">
                       <td className="py-1.5 px-2.5 font-mono font-bold text-emerald-700 whitespace-nowrap">
-                        {r.maintenanceCode}
+                        <span 
+                          className="inline-block py-0.5 px-1.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200 shadow-2xs font-mono font-bold tracking-tight"
+                          title={`Mã phiếu: ${r.maintenanceCode} (Tạo ngày: ${formatDateVN(r.createdAt || r.maintenanceDate)})`}
+                        >
+                          {r.maintenanceCode}
+                        </span>
                       </td>
                       <td className="py-1.5 px-2.5">
                         <div className="font-bold text-slate-800 leading-tight">{r.customerName}</div>
@@ -467,8 +500,8 @@ export const MaintenanceView: React.FC = () => {
                           {hasPermission('maintenance_record_delete') && (
                             <button
                               onClick={() => setDeletingRecord(r)}
-                              title="Xóa phiếu bảo dưỡng"
-                              className="px-2 py-1 rounded border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-semibold inline-flex items-center gap-1 shadow-2xs transition"
+                              title="Xóa phiếu & Cập nhật lại ngày bảo dưỡng (-180 ngày)"
+                              className="px-2 py-1 rounded border border-rose-200 bg-rose-50/70 hover:bg-rose-100 hover:border-rose-300 text-rose-700 text-xs font-semibold inline-flex items-center gap-1 shadow-2xs transition active:scale-95 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                               <span>Xóa</span>
@@ -512,7 +545,14 @@ export const MaintenanceView: React.FC = () => {
                   <label className="block text-[9.5px] font-bold text-black mb-0.5 leading-tight">Khách Hàng</label>
                   <select
                     value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedCustomerId(newId);
+                      const found = customers.find(c => c.id === newId);
+                      if (found?.nextMaintenanceDate) {
+                        setMaintenanceDate(found.nextMaintenanceDate);
+                      }
+                    }}
                     className="w-full px-2 py-1 rounded border border-slate-200 text-xs text-black font-medium"
                     required
                   >
@@ -526,7 +566,7 @@ export const MaintenanceView: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[9.5px] font-bold text-black leading-tight">Ngày Bảo Dưỡng</label>
+                    <label className="text-[9.5px] font-bold text-black leading-tight">Ngày Bảo Dưỡng (Ngày Cũ)</label>
                     {maintenanceDate && <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(maintenanceDate)}</span>}
                   </div>
                   <input
@@ -551,13 +591,37 @@ export const MaintenanceView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[9.5px] font-bold text-black mb-0.5 leading-tight">Kỳ Kế Tiếp Tự Động Tính (+180 ngày)</label>
-                  <div className="px-2 py-0.5 bg-emerald-50 rounded border border-emerald-200 text-emerald-800 font-bold text-xs">
-                    {(() => {
-                      const d = new Date(maintenanceDate);
-                      d.setDate(d.getDate() + 180);
-                      return formatDateVN(d.toISOString().split('T')[0]);
-                    })()}
+                  <label className="block text-[9.5px] font-bold text-black mb-0.5 leading-tight">Ngày Bảo Dưỡng Mới (+180 ngày)</label>
+                  <div className="px-2 py-0.5 bg-emerald-50 rounded border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-between">
+                    <span>
+                      {(() => {
+                        const d = new Date(maintenanceDate);
+                        d.setDate(d.getDate() + 180);
+                        return formatDateVN(d.toISOString().split('T')[0]);
+                      })()}
+                    </span>
+                    <span className="text-[9px] text-emerald-700 font-mono font-bold bg-emerald-100/60 px-1 rounded">
+                      Mã KH: {customers.find(c => c.id === selectedCustomerId)?.customerCode || ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[9.5px] font-bold text-black leading-tight">
+                      Số Phiếu Bảo Dưỡng (Tự động theo ngày tạo phiếu: BD + NgàyThángNăm - Thứ tự)
+                    </label>
+                    <span className="text-[9px] text-slate-500 font-medium">
+                      Ví dụ ngày tạo {formatDateVN(new Date())}: {generateMaintenanceCode(new Date(), maintenanceRecords)}
+                    </span>
+                  </div>
+                  <div className="px-2 py-1 bg-emerald-50/70 rounded border border-emerald-300 text-emerald-900 font-mono font-bold text-xs flex items-center justify-between shadow-2xs">
+                    <span className="tracking-wide">
+                      {editingRecord ? editingRecord.maintenanceCode : generateMaintenanceCode(new Date(), maintenanceRecords)}
+                    </span>
+                    <span className="text-[9px] font-sans font-semibold text-emerald-800 bg-white px-1.5 py-0.2 rounded border border-emerald-200">
+                      {editingRecord ? 'Mã phiếu hiện tại' : 'Số phiếu theo ngày tạo hôm nay'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -665,14 +729,18 @@ export const MaintenanceView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs shadow-xs transition"
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-emerald-800/60 disabled:cursor-not-allowed disabled:opacity-75 text-white font-bold rounded text-xs shadow-xs transition cursor-pointer select-none flex items-center gap-1.5"
                 >
-                  {isSubmitting 
-                    ? 'Đang lưu...' 
-                    : editingRecord 
-                      ? 'Cập Nhật Phiếu' 
-                      : 'Lưu & Tự Động Gia Hạn +180 Ngày'
-                  }
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Đang lưu phiếu...</span>
+                    </>
+                  ) : editingRecord ? (
+                    'Cập Nhật Phiếu'
+                  ) : (
+                    'Lưu & Tự Động Gia Hạn +180 Ngày'
+                  )}
                 </button>
               </div>
             </form>
@@ -696,13 +764,22 @@ export const MaintenanceView: React.FC = () => {
 
             <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
               <div><strong className="text-slate-800">Mã phiếu:</strong> <span className="font-mono font-bold text-emerald-700">{deletingRecord.maintenanceCode}</span></div>
-              <div><strong className="text-slate-800">Khách hàng:</strong> {deletingRecord.customerName} ({deletingRecord.customerCode})</div>
-              <div><strong className="text-slate-800">Ngày bảo dưỡng:</strong> {formatDateVN(deletingRecord.maintenanceDate)}</div>
-              <div><strong className="text-slate-800">Kỹ thuật viên:</strong> {deletingRecord.technicianName}</div>
+              <div><strong className="text-slate-800">Khách hàng:</strong> {deletingRecord.customerName} (<span className="font-mono font-bold text-emerald-700">{deletingRecord.customerCode}</span>)</div>
+              <div><strong className="text-slate-800">Kỳ tiếp theo của phiếu:</strong> {formatDateVN(deletingRecord.nextScheduledDate)}</div>
+              <div className="pt-1.5 border-t border-slate-200 text-emerald-800 font-semibold flex items-center justify-between">
+                <span>Cập nhật lại ngày bảo dưỡng (-180 ngày):</span>
+                <span className="font-bold font-mono bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded">
+                  {(() => {
+                    const d = new Date(deletingRecord.nextScheduledDate || deletingRecord.maintenanceDate);
+                    d.setDate(d.getDate() - 180);
+                    return formatDateVN(d.toISOString().split('T')[0]);
+                  })()}
+                </span>
+              </div>
             </div>
 
             <p className="text-xs text-slate-600">
-              Bạn có chắc chắn muốn xóa vĩnh viễn phiếu bảo dưỡng này khỏi hệ thống cơ sở dữ liệu?
+              Bạn có chắc chắn muốn xóa vĩnh viễn phiếu bảo dưỡng này? Ngày bảo dưỡng của khách hàng <span className="font-bold text-emerald-700">{deletingRecord.customerCode}</span> sẽ tự động trừ đi 180 ngày tương ứng.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

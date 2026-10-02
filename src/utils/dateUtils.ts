@@ -62,6 +62,61 @@ export function formatDateTimeVN(dateInput: string | Date | null | undefined, fa
 }
 
 /**
+ * Tạo số phiếu bảo dưỡng theo công thức:
+ * Chữ BD + 2 số của ngày tạo phiếu + 2 số của tháng tạo phiếu + 4 số của năm tạo phiếu + dấu - + Thứ tự phiếu của ngày tạo.
+ * Ví dụ: Ngày tạo phiếu 02/10/2026 số phiếu thứ nhất sẽ là: BD02102026-01
+ */
+export function generateMaintenanceCode(
+  creationDateInput: string | Date | null | undefined = new Date(), 
+  existingCodesOrRecords: Array<{ maintenanceCode?: string; maintenanceDate?: string; createdAt?: string } | string> = []
+): string {
+  let dayStr = '';
+  let monthStr = '';
+  let yearStr = '';
+
+  if (!creationDateInput) {
+    const now = new Date();
+    dayStr = String(now.getDate()).padStart(2, '0');
+    monthStr = String(now.getMonth() + 1).padStart(2, '0');
+    yearStr = String(now.getFullYear());
+  } else if (typeof creationDateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(creationDateInput.trim())) {
+    const parts = creationDateInput.trim().split('-');
+    yearStr = parts[0];
+    monthStr = parts[1].padStart(2, '0');
+    dayStr = parts[2].padStart(2, '0');
+  } else {
+    const d = creationDateInput instanceof Date ? creationDateInput : new Date(creationDateInput);
+    if (isNaN(d.getTime())) {
+      const now = new Date();
+      dayStr = String(now.getDate()).padStart(2, '0');
+      monthStr = String(now.getMonth() + 1).padStart(2, '0');
+      yearStr = String(now.getFullYear());
+    } else {
+      dayStr = String(d.getDate()).padStart(2, '0');
+      monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      yearStr = String(d.getFullYear());
+    }
+  }
+
+  const prefix = `BD${dayStr}${monthStr}${yearStr}-`;
+
+  let maxSeq = 0;
+  existingCodesOrRecords.forEach(item => {
+    const code = typeof item === 'string' ? item : (item.maintenanceCode || '');
+    if (code && code.startsWith(prefix)) {
+      const seqStr = code.slice(prefix.length);
+      const parsed = parseInt(seqStr, 10);
+      if (!isNaN(parsed) && parsed > maxSeq) {
+        maxSeq = parsed;
+      }
+    }
+  });
+
+  const nextSeq = String(maxSeq + 1).padStart(2, '0');
+  return `${prefix}${nextSeq}`;
+}
+
+/**
  * Convert a Date object to YYYY-MM-DD (useful for HTML <input type="date"> value)
  */
 export function toInputDateFormat(date: Date = new Date()): string {

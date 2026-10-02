@@ -6,7 +6,9 @@ import {
   setDoc, 
   updateDoc, 
   deleteDoc, 
-  getDocs 
+  getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { seedInitialDatabaseIfEmpty, INITIAL_CUSTOMERS, INITIAL_INVENTORY, INITIAL_CASH_TRANSACTIONS, INITIAL_MAINTENANCE } from '../firebase/seed';
@@ -20,7 +22,7 @@ import {
   ActivityLog
 } from '../types';
 import { useAuth } from './AuthContext';
-import { formatDateVN } from '../utils/dateUtils';
+import { formatDateVN, generateMaintenanceCode } from '../utils/dateUtils';
 
 interface DataContextType {
   customers: Customer[];
@@ -68,6 +70,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+
+  // Guard against duplicate maintenance ticket creations
+  const pendingMaintenanceRef = React.useRef<Set<string>>(new Set());
 
   // Explicit fetch function to guarantee fresh retrieval directly from Firestore
   const refreshData = async () => {
@@ -151,10 +156,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCashTransactions(list.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
     }, () => {});
 
-    // Listen to maintenance records in real time
+    // Listen to maintenance records in real time with strict deduplication
     const unsubMaint = onSnapshot(collection(db, 'maintenanceRecords'), (snapshot) => {
-      const list: MaintenanceRecord[] = [];
-      snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as MaintenanceRecord));
+      const map = new Map<string, MaintenanceRecord>();
+      snapshot.forEach((d) => {
+        const item = { ...d.data(), id: d.id } as MaintenanceRecord;
+        if (!map.has(item.id)) {
+          map.set(item.id, item);
+        }
+      });
+      const list = Array.from(map.values());
+
+      // Auto-validate and synchronize maintenance code to match creation date formula (BD + ddMMyyyy - xx)
+      list.forEach((rec) => {
+        if (rec.createdAt) {
+          const cDate = new Date(rec.createdAt);
+          if (!isNaN(cDate.getTime())) {
+            const dayStr = String(cDate.getDate()).padStart(2, '0');
+            const monthStr = String(cDate.getMonth() + 1).padStart(2, '0');
+            const yearStr = String(cDate.getFullYear());
+            const expectedPrefix = `BD${dayStr}${monthStr}${yearStr}-`;
+
+            // If the code is missing, old format (BD-YYYYMM), or didn't match the creation date:
+            if (!rec.maintenanceCode || !rec.maintenanceCode.startsWith(expectedPrefix)) {
+              const correctedCode = generateMaintenanceCode(cDate, list.filter(other => other.id !== rec.id));
+              rec.maintenanceCode = correctedCode;
+              // Synchronize back to Firestore
+              try {
+                updateDoc(doc(db, 'maintenanceRecords', rec.id), { maintenanceCode: correctedCode });
+              } catch (e) {
+                console.warn('Auto-sync maintenanceCode failed:', e);
+              }
+            }
+          }
+        }
+      });
+
       setMaintenanceRecords(list.sort((a, b) => (b.maintenanceDate || '').localeCompare(a.maintenanceDate || '')));
     }, () => {});
 
@@ -234,7 +271,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const now = new Date().toISOString();
     let totalKW: number | undefined = undefined;
     if (updates.inverters || updates.windTurbines) {
-      const current = customers.find(c => c.id === id);
+      const current = customers.find(c => c.id === id || c.customerCode === id);
       const invs = updates.inverters !== undefined ? updates.inverters : (current?.inverters || []);
       const winds = updates.windTurbines !== undefined ? updates.windTurbines : (current?.windTurbines || []);
       const invKW = invs.reduce((acc, curr) => acc + (Number(curr.capacityKW) || 0), 0);
@@ -242,8 +279,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalKW = invKW + windKW;
     }
 
+    // 1. Optimistically update local state immediately so user sees changes instantly
+    setCustomers(prev => prev.map(c => {
+      if (c.id === id || c.customerCode === id) {
+        return {
+          ...c,
+          ...updates,
+          ...(totalKW !== undefined ? { totalCapacityKW: totalKW } : {}),
+          updatedAt: now
+        };
+      }
+      return c;
+    }));
+
+    // 2. Persist to Firestore
     try {
-      const docRef = doc(db, 'customers', id);
+      const matched = customers.find(c => c.id === id || c.customerCode === id);
+      const targetDocId = matched?.id || id;
+      const docRef = doc(db, 'customers', targetDocId);
       await updateDoc(docRef, {
         ...updates,
         ...(totalKW !== undefined ? { totalCapacityKW: totalKW } : {}),
@@ -316,13 +369,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logActivity('Xóa vĩnh viễn khách hàng', `Xóa vĩnh viễn hồ sơ đã vô hiệu hóa ${target.customerCode} - ${target.customerName}`);
   };
 
-  // Add Maintenance Record & Automatically Add 180 Days to Next Maintenance Date
+  // Add Maintenance Record & Automatically Add 180 Days to Next Maintenance Date for matching customerCode
   const addMaintenanceRecord = async (recordData: Omit<MaintenanceRecord, 'id' | 'createdAt'>) => {
     const id = `maint_${Date.now()}`;
     const now = new Date().toISOString();
 
-    // Auto-calculate +180 days from maintenanceDate
-    const baseDate = new Date(recordData.maintenanceDate || Date.now());
+    // Ensure maintenance code strictly adheres to the ticket creation date formula (ngày tạo phiếu)
+    const creationDate = new Date();
+    const cDay = String(creationDate.getDate()).padStart(2, '0');
+    const cMonth = String(creationDate.getMonth() + 1).padStart(2, '0');
+    const cYear = String(creationDate.getFullYear());
+    const expectedPrefix = `BD${cDay}${cMonth}${cYear}-`;
+
+    const finalCode = (recordData.maintenanceCode && recordData.maintenanceCode.startsWith(expectedPrefix))
+      ? recordData.maintenanceCode
+      : generateMaintenanceCode(creationDate, maintenanceRecords);
+
+    // Lock guard to strictly prevent double submission creating 2 identical records
+    const lockKey = `${recordData.customerCode || recordData.customerId}_${recordData.maintenanceDate || ''}_${finalCode}`;
+    if (pendingMaintenanceRef.current.has(lockKey)) {
+      console.warn('Prevented duplicate maintenance creation for lock:', lockKey);
+      return;
+    }
+    pendingMaintenanceRef.current.add(lockKey);
+    setTimeout(() => {
+      pendingMaintenanceRef.current.delete(lockKey);
+    }, 3000);
+
+    // Find the exact matching customer by customerCode or customerId
+    const targetCustomer = customers.find(c => 
+      (recordData.customerCode && c.customerCode === recordData.customerCode) ||
+      (recordData.customerId && c.id === recordData.customerId) ||
+      (recordData.customerId && c.customerCode === recordData.customerId)
+    );
+
+    // Calculate new maintenance date: old date + 180 days
+    // Base date ("ngày cũ"): prioritize maintenanceDate from the ticket or customer's current nextMaintenanceDate
+    const oldDateStr = recordData.maintenanceDate || targetCustomer?.nextMaintenanceDate || new Date().toISOString().split('T')[0];
+    const baseDate = new Date(oldDateStr);
     const next180Date = new Date(baseDate);
     next180Date.setDate(next180Date.getDate() + 180);
     const nextFormatted = next180Date.toISOString().split('T')[0];
@@ -330,25 +414,81 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fullRecord: MaintenanceRecord = {
       ...recordData,
       id,
-      nextScheduledDate: nextFormatted,
+      maintenanceCode: finalCode,
+      customerCode: targetCustomer?.customerCode || recordData.customerCode,
+      customerId: targetCustomer?.id || recordData.customerId,
+      customerName: targetCustomer?.customerName || recordData.customerName,
+      nextScheduledDate: recordData.nextScheduledDate || nextFormatted,
       createdAt: now
     };
 
+    // 1. Save maintenance record to Firestore
     try {
       await setDoc(doc(db, 'maintenanceRecords', id), fullRecord);
     } catch (e) {
       console.warn('Maintenance saved locally:', e);
     }
 
-    // Update customer nextMaintenanceDate & status
-    if (recordData.customerId) {
-      await updateCustomer(recordData.customerId, {
-        nextMaintenanceDate: nextFormatted,
-        status: 'Hoạt động tốt'
-      });
+    // 2. Optimistically update maintenance records in React state with strict deduplication
+    setMaintenanceRecords(prev => {
+      if (prev.some(r => r.id === fullRecord.id || (r.maintenanceCode && r.maintenanceCode === fullRecord.maintenanceCode))) {
+        return prev;
+      }
+      return [fullRecord, ...prev];
+    });
+
+    // 3. Immediately update the customer with new maintenance date (+180 days) matching exact customerCode
+    const effectiveCode = targetCustomer?.customerCode || recordData.customerCode;
+    const effectiveId = targetCustomer?.id || recordData.customerId;
+
+    if (effectiveCode || effectiveId) {
+      // Optimistically update customers in local state immediately so all views reflect the new date
+      setCustomers(prev => prev.map(c => {
+        if ((effectiveCode && c.customerCode === effectiveCode) || (effectiveId && c.id === effectiveId)) {
+          return {
+            ...c,
+            nextMaintenanceDate: nextFormatted,
+            status: 'Hoạt động tốt',
+            updatedAt: now
+          };
+        }
+        return c;
+      }));
+
+      // Persist customer update to Firestore
+      try {
+        if (effectiveId) {
+          await updateDoc(doc(db, 'customers', effectiveId), {
+            nextMaintenanceDate: nextFormatted,
+            status: 'Hoạt động tốt',
+            updatedAt: now
+          });
+        }
+      } catch (err) {
+        console.warn('Direct doc update error, falling back to query by customerCode:', err);
+      }
+
+      // Ensure Firestore update by customerCode query as well
+      if (effectiveCode) {
+        try {
+          const q = query(collection(db, 'customers'), where('customerCode', '==', effectiveCode));
+          const snap = await getDocs(q);
+          snap.forEach(async (d) => {
+            if (d.id !== effectiveId) {
+              await updateDoc(doc(db, 'customers', d.id), {
+                nextMaintenanceDate: nextFormatted,
+                status: 'Hoạt động tốt',
+                updatedAt: now
+              });
+            }
+          });
+        } catch (codeErr) {
+          console.warn('Query update by customerCode error:', codeErr);
+        }
+      }
     }
 
-    logActivity('Lập phiếu bảo dưỡng', `Phiếu ${recordData.maintenanceCode} cho ${recordData.customerName} (+180 ngày kỳ tiếp theo: ${nextFormatted})`);
+    logActivity('Lập phiếu bảo dưỡng', `Phiếu ${finalCode} cho KH ${effectiveCode} - ${recordData.customerName} (Cập nhật ngày bảo dưỡng mới +180 ngày: ${nextFormatted})`);
   };
 
   const updateMaintenanceRecord = async (id: string, updates: Partial<MaintenanceRecord>) => {
@@ -384,12 +524,86 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteMaintenanceRecord = async (id: string) => {
     const target = maintenanceRecords.find(r => r.id === id);
+    if (!target) return;
+
+    // Calculate rolled-back date: nextScheduledDate - 180 days
+    let rolledBackDate: string;
+    if (target.nextScheduledDate) {
+      const d = new Date(target.nextScheduledDate);
+      d.setDate(d.getDate() - 180);
+      rolledBackDate = d.toISOString().split('T')[0];
+    } else if (target.maintenanceDate) {
+      rolledBackDate = target.maintenanceDate;
+    } else {
+      rolledBackDate = new Date().toISOString().split('T')[0];
+    }
+
+    // 1. Delete document from Firestore maintenanceRecords collection
     try {
       await deleteDoc(doc(db, 'maintenanceRecords', id));
     } catch (e) {
       console.warn('Deleted maintenance locally:', e);
     }
-    logActivity('Xóa phiếu bảo dưỡng', `Xóa phiếu bảo dưỡng ${target?.maintenanceCode || id} (${target?.customerName || ''})`);
+
+    // 2. Optimistically update local maintenanceRecords
+    setMaintenanceRecords(prev => prev.filter(r => r.id !== id));
+
+    // 3. Find customer by customerCode or customerId
+    const targetCustomer = customers.find(c => 
+      (target.customerCode && c.customerCode === target.customerCode) ||
+      (target.customerId && c.id === target.customerId) ||
+      (target.customerId && c.customerCode === target.customerId)
+    );
+
+    const effectiveCode = targetCustomer?.customerCode || target.customerCode;
+    const effectiveId = targetCustomer?.id || target.customerId;
+    const now = new Date().toISOString();
+
+    if (effectiveCode || effectiveId) {
+      // Optimistically update customers in React state immediately
+      setCustomers(prev => prev.map(c => {
+        if ((effectiveCode && c.customerCode === effectiveCode) || (effectiveId && c.id === effectiveId)) {
+          return {
+            ...c,
+            nextMaintenanceDate: rolledBackDate,
+            updatedAt: now
+          };
+        }
+        return c;
+      }));
+
+      // Persist rolled-back maintenance date to Firestore
+      try {
+        if (effectiveId) {
+          await updateDoc(doc(db, 'customers', effectiveId), {
+            nextMaintenanceDate: rolledBackDate,
+            updatedAt: now
+          });
+        }
+      } catch (err) {
+        console.warn('Direct customer update error on maintenance deletion:', err);
+      }
+
+      // Ensure update by customerCode query as well
+      if (effectiveCode) {
+        try {
+          const q = query(collection(db, 'customers'), where('customerCode', '==', effectiveCode));
+          const snap = await getDocs(q);
+          snap.forEach(async (d) => {
+            if (d.id !== effectiveId) {
+              await updateDoc(doc(db, 'customers', d.id), {
+                nextMaintenanceDate: rolledBackDate,
+                updatedAt: now
+              });
+            }
+          });
+        } catch (codeErr) {
+          console.warn('Query update by customerCode error on maintenance deletion:', codeErr);
+        }
+      }
+    }
+
+    logActivity('Xóa phiếu bảo dưỡng', `Xóa phiếu bảo dưỡng ${target.maintenanceCode || id} cho KH ${effectiveCode} (Tự động cập nhật lại ngày bảo dưỡng -180 ngày: ${rolledBackDate})`);
   };
 
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {

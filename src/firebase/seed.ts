@@ -364,7 +364,7 @@ export const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
     customerCode: 'KH000001',
     customerId: 'cust_000001',
     customerName: 'Công Ty May Xuất Khẩu Hòa An',
-    maintenanceCode: 'BD-202603-01',
+    maintenanceCode: 'BD25032026-01',
     maintenanceDate: '2026-03-25',
     technicianName: 'Nguyễn Văn Hùng',
     content: 'Đo kiểm thông số dòng rò, vệ sinh 320 tấm pin mặt trời, siết ốc dàn khung, kiểm tra quạt tản nhiệt Inverter Huawei.',

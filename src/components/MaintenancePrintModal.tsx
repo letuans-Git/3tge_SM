@@ -162,7 +162,15 @@ export const MaintenancePrintModal: React.FC<MaintenancePrintModalProps> = ({
             >
               {badgeText}
             </span>
-            <p className="text-[9.5px] font-mono font-bold mt-0.5" style={{ color: '#334155' }}>
+            <p 
+              className="text-[10px] font-mono font-bold mt-0.5 tracking-tight px-1.5 py-0.5 rounded leading-tight" 
+              style={{ 
+                color: '#064e3b', 
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #a7f3d0',
+                display: 'inline-block'
+              }}
+            >
               Số: {record.maintenanceCode}
             </p>
           </div>
