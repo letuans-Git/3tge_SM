@@ -11,7 +11,14 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { seedInitialDatabaseIfEmpty, INITIAL_CUSTOMERS, INITIAL_INVENTORY, INITIAL_CASH_TRANSACTIONS, INITIAL_MAINTENANCE } from '../firebase/seed';
+import { 
+  seedInitialDatabaseIfEmpty, 
+  seedExtendedCustomersBatch,
+  INITIAL_CUSTOMERS, 
+  INITIAL_INVENTORY, 
+  INITIAL_CASH_TRANSACTIONS, 
+  INITIAL_MAINTENANCE 
+} from '../firebase/seed';
 import {
   Customer,
   MaintenanceRecord,
@@ -54,6 +61,7 @@ interface DataContextType {
     channels: Array<'Email' | 'Zalo OA' | 'Telegram Bot' | 'Push Notification'>
   ) => Promise<{ success: boolean; results: { channel: string; success: boolean; message: string }[] }>;
   logActivity: (action: string, detail: string) => void;
+  seedDemoCustomersBatch: () => Promise<boolean>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -139,6 +147,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCustomers(list);
       setIsLoading(false);
       setIsOnline(true);
+
+      // Auto-complement dataset if database has fewer than 12 customers to allow smart pagination testing
+      if (list.length > 0 && list.length < 12) {
+        seedExtendedCustomersBatch().catch((err) => console.warn('Auto-seed pagination batch note:', err));
+      }
     }, (error) => {
       console.warn('Firestore live sync note:', error);
       setIsLoading(false);
@@ -735,6 +748,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, results };
   };
 
+  const seedDemoCustomersBatch = async (): Promise<boolean> => {
+    try {
+      const ok = await seedExtendedCustomersBatch();
+      if (ok) {
+        logActivity('Nạp dữ liệu mẫu phân trang', 'Nạp thành công 36 hồ sơ khách hàng mẫu chuẩn hóa phân trang');
+      }
+      return ok;
+    } catch (err) {
+      console.error('seedDemoCustomersBatch error:', err);
+      return false;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -763,7 +789,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addCashTransaction,
         deleteCashTransaction,
         sendMaintenanceNotification,
-        logActivity
+        logActivity,
+        seedDemoCustomersBatch
       }}
     >
       {children}

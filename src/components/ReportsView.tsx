@@ -297,24 +297,46 @@ export const ReportsView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {brandList.map(brand => {
-                  const data = brandStats[brand];
-                  const totalKW = customers.reduce((s, c) => s + c.totalCapacityKW, 0) || 1;
-                  const share = Math.round((data.totalKW / totalKW) * 100);
+                {(() => {
+                  const totalInverterBrandsKW = Math.round(Object.values(brandStats).reduce((s, b) => s + b.totalKW, 0) * 100) / 100 || 1;
+                  const totalInverterCount = Object.values(brandStats).reduce((s, b) => s + b.inverters, 0);
+                  const totalBatteryCount = Object.values(brandStats).reduce((s, b) => s + b.batteries, 0);
                   return (
-                    <tr key={brand} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 font-bold text-slate-800">{brand}</td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-700">{data.inverters} bộ</td>
-                      <td className="py-2.5 px-3 text-slate-600">{data.batteries} bộ</td>
-                      <td className="py-2.5 px-3 font-black text-emerald-800">{data.totalKW} KW</td>
-                      <td className="py-2.5 px-3 text-right">
-                        <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                          {share}%
-                        </span>
-                      </td>
-                    </tr>
+                    <>
+                      {brandList.map(brand => {
+                        const data = brandStats[brand];
+                        const exactShare = totalInverterBrandsKW > 0 ? (data.totalKW / totalInverterBrandsKW) * 100 : 0;
+                        const roundedShare = Math.round(exactShare * 10) / 10;
+                        const shareStr = Number.isInteger(roundedShare) ? `${roundedShare}%` : `${roundedShare.toFixed(1)}%`;
+                        return (
+                          <tr key={brand} className="hover:bg-slate-50">
+                            <td className="py-2.5 px-3 font-bold text-slate-800">{brand}</td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-700">{data.inverters} bộ</td>
+                            <td className="py-2.5 px-3 text-slate-600">{data.batteries} bộ</td>
+                            <td className="py-2.5 px-3 font-black text-emerald-800">{data.totalKW.toLocaleString('vi-VN')} KW</td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                {shareStr}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {/* Tổng cộng footer */}
+                      <tr className="bg-slate-50/80 font-bold border-t-2 border-slate-200">
+                        <td className="py-2.5 px-3 text-slate-900">TỔNG CỘNG</td>
+                        <td className="py-2.5 px-3 text-slate-800">{totalInverterCount} bộ</td>
+                        <td className="py-2.5 px-3 text-slate-800">{totalBatteryCount} bộ</td>
+                        <td className="py-2.5 px-3 text-emerald-900 font-extrabold">{totalInverterBrandsKW.toLocaleString('vi-VN')} KW</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[11px] font-black">
+                            100%
+                          </span>
+                        </td>
+                      </tr>
+                    </>
                   );
-                })}
+                })()}
               </tbody>
             </table>
           </div>

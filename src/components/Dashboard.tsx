@@ -32,7 +32,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab }) => {
 
   // 1. KPI Calculations
   const totalCustomers = activeCustomers.length;
-  const totalCapacityKW = activeCustomers.reduce((sum, c) => sum + (c.totalCapacityKW || 0), 0);
+  const totalCapacityKW = activeCustomers.reduce((sum, c) => {
+    const invKW = (c.inverters || []).reduce((s, i) => s + (Number(i.capacityKW) || 0), 0);
+    const windKW = (c.windTurbines || []).reduce((s, w) => s + (Number(w.capacityKW) || 0), 0);
+    const calculated = invKW + windKW;
+    return sum + (calculated > 0 ? calculated : (Number(c.totalCapacityKW) || 0));
+  }, 0);
 
   const activeSystems = activeCustomers.filter(c => c.status === 'Hoạt động tốt').length;
   const needCheckSystems = activeCustomers.filter(c => c.status === 'Cần kiểm tra' || c.status === 'Đang bảo trì').length;
@@ -132,17 +137,155 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab }) => {
   // Low stock inventory alert
   const lowStockItems = inventory.filter(i => i.stockQuantity <= i.minAlertQuantity).length;
 
-  // Group capacity by Brand
-  const brandCapacityMap: Record<string, number> = {};
-  customers.forEach(c => {
-    c.inverters?.forEach(inv => {
-      const b = inv.brand || 'Khác';
-      brandCapacityMap[b] = (brandCapacityMap[b] || 0) + (Number(inv.capacityKW) || 0);
+  // State phân loại thiết bị: 'inverter' (Biến tần - KW) | 'battery' (Pin lưu trữ - KWh) | 'panels' (Tấm pin - kWp)
+  const [equipmentViewType, setEquipmentViewType] = useState<'inverter' | 'battery' | 'panels'>('inverter');
+
+  // Chuẩn hóa tên hãng để thống kê chuẩn xác, không bị phân mảnh chữ hoa thường
+  const normalizeBrandName = (name?: string): string => {
+    if (!name || !name.trim()) return 'Khác';
+    const trimmed = name.trim();
+    const upper = trimmed.toUpperCase();
+    if (upper === 'HUAWEI') return 'HUAWEI';
+    if (upper === 'GOODWE' || upper === 'GOOD WE') return 'GOODWE';
+    if (upper === 'DEYE') return 'DEYE';
+    if (upper === 'SUNGROW') return 'SUNGROW';
+    if (upper === 'LUXPOWER' || upper === 'LUX POWER') return 'LUXPOWER';
+    if (upper === 'PYLONTECH') return 'PYLONTECH';
+    if (upper === 'SMA') return 'SMA';
+    if (upper === 'GROWATT') return 'GROWATT';
+    if (upper === 'SOLIS') return 'SOLIS';
+    if (upper === 'SOFAR') return 'SOFAR';
+    if (upper === 'BYD') return 'BYD';
+    if (upper === 'LONGI') return 'LONGI';
+    if (upper === 'JINKO' || upper === 'JINKO SOLAR') return 'JINKO';
+    if (upper === 'CANADIAN' || upper === 'CANADIAN SOLAR') return 'CANADIAN';
+    if (upper === 'TRINA' || upper === 'TRINA SOLAR') return 'TRINA';
+    if (upper === 'JA_SOLAR' || upper === 'JA SOLAR' || upper === 'JA') return 'JA SOLAR';
+    if (upper === 'AE_SOLAR' || upper === 'AE SOLAR' || upper === 'AE') return 'AE SOLAR';
+    if (upper === 'KHAC' || upper === 'KHÁC') return 'Khác';
+    return upper;
+  };
+
+  // Tính toán công suất và số lượng theo từng hãng từ các trạm đang hoạt động
+  const inverterBrandStats: Record<string, { totalKW: number; count: number }> = {};
+  const batteryBrandStats: Record<string, { totalKWh: number; count: number }> = {};
+  const panelBrandStats: Record<string, { totalKWp: number; quantity: number }> = {};
+
+  activeCustomers.forEach(c => {
+    // Biến tần (Inverters)
+    (c.inverters || []).forEach(inv => {
+      const b = normalizeBrandName(inv.brand);
+      const kw = Number(inv.capacityKW) || 0;
+      if (!inverterBrandStats[b]) {
+        inverterBrandStats[b] = { totalKW: 0, count: 0 };
+      }
+      inverterBrandStats[b].totalKW += kw;
+      inverterBrandStats[b].count += 1;
     });
+
+    // Pin lưu trữ (Batteries)
+    (c.batteries || []).forEach(bat => {
+      const b = normalizeBrandName(bat.brand);
+      const kwh = Number(bat.capacityKWh) || 0;
+      if (!batteryBrandStats[b]) {
+        batteryBrandStats[b] = { totalKWh: 0, count: 0 };
+      }
+      batteryBrandStats[b].totalKWh += kwh;
+      batteryBrandStats[b].count += 1;
+    });
+
+    // Tấm pin mặt trời (Solar panels)
+    if (c.solarPanels && c.solarPanels.brand) {
+      const b = normalizeBrandName(c.solarPanels.brand);
+      const qty = Number(c.solarPanels.quantity) || 0;
+      const watt = Number(c.solarPanels.wattPerPanel) || 0;
+      const kwp = (qty * watt) / 1000;
+      if (!panelBrandStats[b]) {
+        panelBrandStats[b] = { totalKWp: 0, quantity: 0 };
+      }
+      panelBrandStats[b].totalKWp += kwp;
+      panelBrandStats[b].quantity += qty;
+    }
   });
 
-  const brandEntries = Object.entries(brandCapacityMap).sort((a, b) => b[1] - a[1]);
-  const maxBrandKW = Math.max(...brandEntries.map(e => e[1]), 1);
+  // Tổng công suất thực tế theo từng danh mục
+  const totalInverterKW = Math.round(Object.values(inverterBrandStats).reduce((s, item) => s + item.totalKW, 0) * 100) / 100;
+  const totalBatteryKWh = Math.round(Object.values(batteryBrandStats).reduce((s, item) => s + item.totalKWh, 0) * 100) / 100;
+  const totalPanelKWp = Math.round(Object.values(panelBrandStats).reduce((s, item) => s + item.totalKWp, 0) * 100) / 100;
+
+  // Lấy dữ liệu và tính toán tỷ lệ % chuẩn xác theo danh mục đang chọn
+  let currentEquipmentEntries: Array<{
+    brand: string;
+    value: number;
+    unit: string;
+    countLabel: string;
+    percentage: string;
+  }> = [];
+
+  let currentCategoryTotal = totalInverterKW;
+  let currentCategoryUnit = 'KW';
+
+  if (equipmentViewType === 'inverter') {
+    currentCategoryTotal = totalInverterKW;
+    currentCategoryUnit = 'KW';
+    currentEquipmentEntries = Object.entries(inverterBrandStats)
+      .map(([brand, data]) => {
+        const val = Math.round(data.totalKW * 100) / 100;
+        const exactPct = totalInverterKW > 0 ? (val / totalInverterKW) * 100 : 0;
+        const roundedPct = Math.round(exactPct * 10) / 10;
+        const pctStr = Number.isInteger(roundedPct) ? `${roundedPct}%` : `${roundedPct.toFixed(1)}%`;
+        return {
+          brand,
+          value: val,
+          unit: 'KW',
+          countLabel: `${data.count} bộ`,
+          percentage: pctStr
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  } else if (equipmentViewType === 'battery') {
+    currentCategoryTotal = totalBatteryKWh;
+    currentCategoryUnit = 'KWh';
+    currentEquipmentEntries = Object.entries(batteryBrandStats)
+      .map(([brand, data]) => {
+        const val = Math.round(data.totalKWh * 100) / 100;
+        const exactPct = totalBatteryKWh > 0 ? (val / totalBatteryKWh) * 100 : 0;
+        const roundedPct = Math.round(exactPct * 10) / 10;
+        const pctStr = Number.isInteger(roundedPct) ? `${roundedPct}%` : `${roundedPct.toFixed(1)}%`;
+        return {
+          brand,
+          value: val,
+          unit: 'KWh',
+          countLabel: `${data.count} bộ`,
+          percentage: pctStr
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  } else {
+    currentCategoryTotal = totalPanelKWp;
+    currentCategoryUnit = 'kWp';
+    currentEquipmentEntries = Object.entries(panelBrandStats)
+      .map(([brand, data]) => {
+        const val = Math.round(data.totalKWp * 100) / 100;
+        const exactPct = totalPanelKWp > 0 ? (val / totalPanelKWp) * 100 : 0;
+        const roundedPct = Math.round(exactPct * 10) / 10;
+        const pctStr = Number.isInteger(roundedPct) ? `${roundedPct}%` : `${roundedPct.toFixed(1)}%`;
+        return {
+          brand,
+          value: val,
+          unit: 'kWp',
+          countLabel: `${data.quantity.toLocaleString('vi-VN')} tấm`,
+          percentage: pctStr
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  }
+
+  const maxEntryVal = Math.max(...currentEquipmentEntries.map(e => e.value), 1);
+
+  const formatCapacityVal = (val: number): string => {
+    return val.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+  };
 
   // Status breakdown
   const statusCounts = [
@@ -299,35 +442,75 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToTab }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Brand Capacity Bar Chart */}
         <div className="lg:col-span-2 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-bold text-slate-800">Công Suất Theo Hãng Biến Tần</h2>
-              <p className="text-[11px] text-slate-500">Phân bố công suất KW biến tần thực tế lắp đặt</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-bold text-slate-800">
+                  {equipmentViewType === 'inverter' && 'Công Suất Lắp Đặt Theo Hãng Biến Tần'}
+                  {equipmentViewType === 'battery' && 'Dung Lượng Lưu Trữ Theo Hãng Pin'}
+                  {equipmentViewType === 'panels' && 'Công Suất Tấm Pin Theo Hãng (kWp)'}
+                </h2>
+                <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10.5px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setEquipmentViewType('inverter')}
+                    className={`px-2 py-0.5 rounded-md transition ${equipmentViewType === 'inverter' ? 'bg-white text-emerald-800 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Biến tần (KW)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEquipmentViewType('battery')}
+                    className={`px-2 py-0.5 rounded-md transition ${equipmentViewType === 'battery' ? 'bg-white text-emerald-800 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Pin lưu trữ (KWh)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEquipmentViewType('panels')}
+                    className={`px-2 py-0.5 rounded-md transition ${equipmentViewType === 'panels' ? 'bg-white text-emerald-800 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    Tấm pin (kWp)
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Tỷ lệ phần trăm tính chuẩn xác trên tổng {formatCapacityVal(currentCategoryTotal)} {currentCategoryUnit} thực tế lắp đặt
+              </p>
             </div>
-            <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-              Tổng {totalCapacityKW} KW
+            <span className="text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2.5 py-1 rounded-lg shrink-0 self-start sm:self-auto">
+              Tổng {formatCapacityVal(currentCategoryTotal)} {currentCategoryUnit}
             </span>
           </div>
 
           <div className="space-y-1.5 pt-1">
-            {brandEntries.map(([brand, kw]) => {
-              const pct = Math.round((kw / (totalCapacityKW || 1)) * 100);
-              const barWidth = Math.round((kw / maxBrandKW) * 100);
-              return (
-                <div key={brand} className="space-y-0.5">
-                  <div className="flex justify-between text-[11px] font-semibold">
-                    <span className="text-slate-700">{brand}</span>
-                    <span className="text-slate-900 font-bold">{kw} KW ({pct}%)</span>
+            {currentEquipmentEntries.length === 0 ? (
+              <div className="py-4 text-center text-xs text-slate-400">
+                Chưa có dữ liệu thiết bị cho danh mục này.
+              </div>
+            ) : (
+              currentEquipmentEntries.map((item) => {
+                const barWidth = Math.round((item.value / maxEntryVal) * 100);
+                return (
+                  <div key={item.brand} className="space-y-0.5">
+                    <div className="flex justify-between text-[11px] font-semibold">
+                      <span className="text-slate-700">
+                        {item.brand} <span className="text-slate-400 font-normal text-[10px]">({item.countLabel})</span>
+                      </span>
+                      <span className="text-slate-900 font-bold">
+                        {formatCapacityVal(item.value)} {item.unit} ({item.percentage})
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                      <div 
+                        className="bg-linear-to-r from-emerald-500 to-teal-600 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                    <div 
-                      className="bg-linear-to-r from-emerald-500 to-teal-600 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           {/* 12-Month Handover Contract Chart */}
