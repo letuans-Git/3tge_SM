@@ -88,7 +88,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const custList: Customer[] = [];
       custSnap.forEach((d) => custList.push({ ...d.data(), id: d.id } as Customer));
-      custList.sort((a, b) => (b.customerCode || '').localeCompare(a.customerCode || ''));
+      custList.sort((a, b) => {
+        const tA = a.handoverDate ? new Date(a.handoverDate).getTime() : 0;
+        const tB = b.handoverDate ? new Date(b.handoverDate).getTime() : 0;
+        if (tB !== tA) return tB - tA;
+        return (b.customerCode || '').localeCompare(a.customerCode || '');
+      });
       setCustomers(custList);
 
       const invList: InventoryItem[] = [];
@@ -125,7 +130,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubCust = onSnapshot(collection(db, 'customers'), (snapshot) => {
       const list: Customer[] = [];
       snapshot.forEach((d) => list.push({ ...d.data(), id: d.id } as Customer));
-      list.sort((a, b) => (b.customerCode || '').localeCompare(a.customerCode || ''));
+      list.sort((a, b) => {
+        const tA = a.handoverDate ? new Date(a.handoverDate).getTime() : 0;
+        const tB = b.handoverDate ? new Date(b.handoverDate).getTime() : 0;
+        if (tB !== tA) return tB - tA;
+        return (b.customerCode || '').localeCompare(a.customerCode || '');
+      });
       setCustomers(list);
       setIsLoading(false);
       setIsOnline(true);

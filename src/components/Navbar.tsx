@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { PermissionAction } from '../types/permissions';
 import { UserManagementModal } from './UserManagementModal';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type NavTab = 'dashboard' | 'customers' | 'maintenance' | 'inventory' | 'cashflow' | 'reports';
 
@@ -66,8 +67,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs w-full">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between h-16">
             {/* Logo & Brand */}
             <div className="flex items-center gap-3">
@@ -75,6 +76,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => onSelectTab('dashboard')} 
                 className="flex items-center gap-2.5 cursor-pointer group"
               >
+                <img 
+                  src="/logo-vuong.png" 
+                  alt="3TGE Logo" 
+                  className="w-9 h-9 rounded-lg shadow-2xs border border-slate-200/80 group-hover:scale-105 transition-transform shrink-0" 
+                />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-extrabold text-xl tracking-tight bg-linear-to-r from-emerald-700 via-teal-700 to-cyan-700 bg-clip-text text-transparent">
@@ -115,6 +121,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* User Profile, Manage Permissions button & Logout */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Install PWA button for Desktop & Mobile shortcuts */}
+              <div className="hidden sm:block">
+                <PWAInstallButton compact />
+              </div>
+
               {/* User Management & Permissions button for Admins or users with permission */}
               {(currentUser?.role === 'admin' || hasPermission('users_view') || hasPermission('roles_configure')) && (
                 <button
@@ -161,70 +172,77 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Drawer Navigation */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-slate-200 bg-white/98 px-4 pt-3 pb-5 space-y-3 animate-in slide-in-from-top-2 duration-150">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div>
-                <div className="text-xs font-bold text-slate-800">{currentUser?.fullName}</div>
-                <div className="text-[10px] text-slate-500">Username: <span className="font-mono font-bold text-emerald-700">{currentUser?.username}</span></div>
+          <div className="lg:hidden border-t border-slate-200 bg-white/98 w-full animate-in slide-in-from-top-2 duration-150">
+            <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 pb-5 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div>
+                  <div className="text-xs font-bold text-slate-800">{currentUser?.fullName}</div>
+                  <div className="text-[10px] text-slate-500">Username: <span className="font-mono font-bold text-emerald-700">{currentUser?.username}</span></div>
+                </div>
+                <div>
+                  {currentUser && getRoleBadge(currentUser.role)}
+                </div>
               </div>
-              <div>
-                {currentUser && getRoleBadge(currentUser.role)}
+
+              {/* Install App on mobile shortcut */}
+              <div className="pt-0.5">
+                <PWAInstallButton />
               </div>
-            </div>
 
-            {(currentUser?.role === 'admin' || hasPermission('users_view') || hasPermission('roles_configure')) && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsUserMgmtOpen(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 text-xs"
-              >
-                <Users className="w-4 h-4 text-emerald-600" />
-                Quản Lý Người Dùng & Phân Quyền ({users.length} Users)
-              </button>
-            )}
+              {(currentUser?.role === 'admin' || hasPermission('users_view') || hasPermission('roles_configure')) && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setIsUserMgmtOpen(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 text-xs"
+                >
+                  <Users className="w-4 h-4 text-emerald-600" />
+                  Quản Lý Người Dùng & Phân Quyền ({users.length} Users)
+                </button>
+              )}
 
-            <div className="space-y-1">
-              {navItems.map((item) => {
-                if (!hasPermission(item.requiredPerm)) {
-                  return null;
-                }
-                const isActive = currentTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onSelectTab(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
-                      isActive
-                        ? 'bg-emerald-50 text-emerald-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
-                      <span>{item.label}</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </button>
-                );
-              })}
-            </div>
+              <div className="space-y-1">
+                {navItems.map((item) => {
+                  if (!hasPermission(item.requiredPerm)) {
+                    return null;
+                  }
+                  const isActive = currentTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onSelectTab(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                        isActive
+                          ? 'bg-emerald-50 text-emerald-700 font-bold'
+                          : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  logout();
-                }}
-                className="w-full py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-lg text-xs flex items-center justify-center gap-2 border border-rose-200"
-              >
-                <LogOut className="w-4 h-4" />
-                Đăng Xuất Khỏi Hệ Thống
-              </button>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  className="w-full py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold rounded-lg text-xs flex items-center justify-center gap-2 border border-rose-200"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Đăng Xuất Khỏi Hệ Thống
+                </button>
+              </div>
             </div>
           </div>
         )}

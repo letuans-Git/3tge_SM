@@ -23,7 +23,15 @@ import {
 } from 'lucide-react';
 import { Customer, InverterItem, BatteryItem, SolarBrand, InverterBrand, BatteryBrand, SystemStatus, WindTurbineItem } from '../types';
 import { compressImage } from '../utils/imageCompressor';
-import { formatDateVN } from '../utils/dateUtils';
+import { 
+  formatDateVN, 
+  toDMY, 
+  dmyToISO, 
+  isValidDMY, 
+  formatDMYInput, 
+  add180DaysDMY, 
+  defaultWarrantyDMY 
+} from '../utils/dateUtils';
 import { useEquipmentBrands } from '../utils/brandUtils';
 import { BrandSelectField } from './BrandSelectField';
 import { useDistributors } from '../utils/distributorUtils';
@@ -39,6 +47,16 @@ interface CustomerFormModalProps {
 
 const SYSTEM_STATUSES: SystemStatus[] = ['Hoạt động tốt', 'Cần kiểm tra', 'Đang bảo trì', 'Ngừng hoạt động'];
 const DEFAULT_CONTRACT_NUMBER = '999901/HĐNLMT-2026/3TGE';
+
+/**
+ * Tự động viết hoa chữ cái đầu tiên của mỗi từ (hỗ trợ đầy đủ tiếng Việt và Unicode)
+ */
+export const capitalizeWords = (str: string): string => {
+  if (!str) return '';
+  return str.replace(/(^|[\s\-_./()&,["'“”‘’])(\p{Ll})/gu, (_, prefix, char) => {
+    return prefix + char.toUpperCase();
+  });
+};
 
 export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   isOpen,
@@ -63,48 +81,45 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   } = useDistributors();
 
   // Form states
-  const [customerName, setCustomerName] = useState(initialData?.customerName || '');
-  const [address, setAddress] = useState(initialData?.address || '');
+  const [customerName, setCustomerName] = useState(capitalizeWords(initialData?.customerName || ''));
+  const [address, setAddress] = useState(capitalizeWords(initialData?.address || ''));
   const [province, setProvince] = useState(initialData?.province || 'Hải Phòng');
-  const [phoneNumber, setPhoneNumber] = useState(initialData?.phoneNumber || '');
+  const [phoneNumber, setPhoneNumber] = useState((initialData?.phoneNumber || '').replace(/\D/g, ''));
   const [contractNumber, setContractNumber] = useState(initialData?.contractNumber || DEFAULT_CONTRACT_NUMBER);
-  const [handoverDate, setHandoverDate] = useState(initialData?.handoverDate || new Date().toISOString().split('T')[0]);
-  
-  // Helper to calculate date + 180 days based on a reference date
-  const add180Days = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      d.setDate(d.getDate() + 180);
-      return d.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
-
-  const defaultWarranty = () => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 5); // 5 years
-    return d.toISOString().split('T')[0];
-  };
-
-  const [nextMaintenanceDate, setNextMaintenanceDate] = useState(
-    initialData?.nextMaintenanceDate || add180Days(initialData?.handoverDate || new Date().toISOString().split('T')[0])
+  const [handoverDate, setHandoverDate] = useState(
+    initialData?.handoverDate ? toDMY(initialData.handoverDate) : toDMY(new Date())
   );
-  const [warrantyExpiryDate, setWarrantyExpiryDate] = useState(initialData?.warrantyExpiryDate || defaultWarranty());
+  const [nextMaintenanceDate, setNextMaintenanceDate] = useState(
+    initialData?.nextMaintenanceDate 
+      ? toDMY(initialData.nextMaintenanceDate) 
+      : add180DaysDMY(initialData?.handoverDate ? toDMY(initialData.handoverDate) : toDMY(new Date()))
+  );
+  const [warrantyExpiryDate, setWarrantyExpiryDate] = useState(
+    initialData?.warrantyExpiryDate 
+      ? toDMY(initialData.warrantyExpiryDate) 
+      : defaultWarrantyDMY(initialData?.handoverDate ? toDMY(initialData.handoverDate) : toDMY(new Date()))
+  );
   const [status, setStatus] = useState<SystemStatus>(initialData?.status || 'Hoạt động tốt');
   const [notes, setNotes] = useState(initialData?.notes || '');
 
-  // Automatically add 180 days to nextMaintenanceDate whenever handoverDate is changed
-  const handleHandoverDateChange = (newDate: string) => {
-    setHandoverDate(newDate);
-    if (newDate) {
-      const next180 = add180Days(newDate);
-      if (next180) {
-        setNextMaintenanceDate(next180);
-      }
+  // Automatically update nextMaintenanceDate (+180 days) & warrantyExpiryDate (+5 years) when handoverDate is valid
+  const handleHandoverDateChange = (val: string) => {
+    const formatted = formatDMYInput(val, handoverDate);
+    setHandoverDate(formatted);
+    if (isValidDMY(formatted)) {
+      setNextMaintenanceDate(add180DaysDMY(formatted));
+      setWarrantyExpiryDate(defaultWarrantyDMY(formatted));
     }
+  };
+
+  const handleNextMaintenanceDateChange = (val: string) => {
+    const formatted = formatDMYInput(val, nextMaintenanceDate);
+    setNextMaintenanceDate(formatted);
+  };
+
+  const handleWarrantyExpiryDateChange = (val: string) => {
+    const formatted = formatDMYInput(val, warrantyExpiryDate);
+    setWarrantyExpiryDate(formatted);
   };
 
   // Inverters (max 5)
@@ -154,15 +169,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   // Sync form state when initialData or modal open status changes
   useEffect(() => {
     if (isOpen) {
-      setCustomerName(initialData?.customerName || '');
-      setAddress(initialData?.address || '');
+      setCustomerName(capitalizeWords(initialData?.customerName || ''));
+      setAddress(capitalizeWords(initialData?.address || ''));
       setProvince(initialData?.province || 'Hải Phòng');
-      setPhoneNumber(initialData?.phoneNumber || '');
+      setPhoneNumber((initialData?.phoneNumber || '').replace(/\D/g, ''));
       setContractNumber(initialData?.contractNumber || DEFAULT_CONTRACT_NUMBER);
-      const initHandover = initialData?.handoverDate || new Date().toISOString().split('T')[0];
+      const initHandover = initialData?.handoverDate ? toDMY(initialData.handoverDate) : toDMY(new Date());
       setHandoverDate(initHandover);
-      setNextMaintenanceDate(initialData?.nextMaintenanceDate || add180Days(initHandover));
-      setWarrantyExpiryDate(initialData?.warrantyExpiryDate || defaultWarranty());
+      setNextMaintenanceDate(
+        initialData?.nextMaintenanceDate ? toDMY(initialData.nextMaintenanceDate) : add180DaysDMY(initHandover)
+      );
+      setWarrantyExpiryDate(
+        initialData?.warrantyExpiryDate ? toDMY(initialData.warrantyExpiryDate) : defaultWarrantyDMY(initHandover)
+      );
       setStatus(initialData?.status || 'Hoạt động tốt');
       setNotes(initialData?.notes || '');
       setInverters(
@@ -301,13 +320,40 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       return;
     }
 
+    if (!handoverDate.trim()) {
+      setErrorMsg('Vui lòng nhập Ngày Bàn Giao!');
+      return;
+    }
+    if (!isValidDMY(handoverDate)) {
+      setErrorMsg('Ngày Bàn Giao bắt buộc phải đúng định dạng ngày tháng năm dd/MM/yyyy (ví dụ: 25/12/2026)!');
+      return;
+    }
+
+    if (!nextMaintenanceDate.trim()) {
+      setErrorMsg('Vui lòng nhập Kỳ Bảo Dưỡng!');
+      return;
+    }
+    if (!isValidDMY(nextMaintenanceDate)) {
+      setErrorMsg('Kỳ Bảo Dưỡng bắt buộc phải đúng định dạng ngày tháng năm dd/MM/yyyy (ví dụ: 25/06/2027)!');
+      return;
+    }
+
+    if (!warrantyExpiryDate.trim()) {
+      setErrorMsg('Vui lòng nhập Hạn Bảo Hành!');
+      return;
+    }
+    if (!isValidDMY(warrantyExpiryDate)) {
+      setErrorMsg('Hạn Bảo Hành bắt buộc phải đúng định dạng ngày tháng năm dd/MM/yyyy (ví dụ: 25/12/2031)!');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorMsg('');
 
       await onSubmit({
-        customerName: customerName.trim(),
-        address: address.trim(),
+        customerName: capitalizeWords(customerName.trim()),
+        address: capitalizeWords(address.trim()),
         province,
         phoneNumber: phoneNumber.trim(),
         contractNumber: contractNumber.trim() || DEFAULT_CONTRACT_NUMBER,
@@ -318,9 +364,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           totalKWp: ((solarPanels.quantity || 0) * (solarPanels.wattPerPanel || 0)) / 1000
         },
         windTurbines,
-        handoverDate,
-        nextMaintenanceDate,
-        warrantyExpiryDate,
+        handoverDate: dmyToISO(handoverDate),
+        nextMaintenanceDate: dmyToISO(nextMaintenanceDate),
+        warrantyExpiryDate: dmyToISO(warrantyExpiryDate),
         status,
         notes: notes.trim(),
         images
@@ -384,8 +430,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   required
                   placeholder="Ví dụ: Công Ty May Hoà An / Anh Nguyễn Văn A"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-medium"
+                  onChange={(e) => setCustomerName(capitalizeWords(e.target.value))}
+                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-medium capitalize"
                 />
               </div>
 
@@ -395,10 +441,22 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
-                  placeholder="0913.xxx.xxx"
+                  placeholder="0913xxxxxx"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => {
+                    if (
+                      !/^\d$/.test(e.key) &&
+                      !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                      !e.ctrlKey &&
+                      !e.metaKey
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-medium"
                 />
               </div>
@@ -425,8 +483,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   required
                   placeholder="Số nhà, đường, phường/xã, quận/huyện"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-medium"
+                  onChange={(e) => setAddress(capitalizeWords(e.target.value))}
+                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-medium capitalize"
                 />
               </div>
 
@@ -820,45 +878,187 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </h3>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              <div>
-                <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-[9px] font-bold text-black leading-tight">Ngày Bàn Giao</label>
-                  {handoverDate && <span className="text-[8.5px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(handoverDate)}</span>}
-                </div>
-                <input
-                  type="date"
-                  value={handoverDate}
-                  onChange={(e) => handleHandoverDateChange(e.target.value)}
-                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 text-black font-medium"
-                />
-              </div>
-
-              <div>
+              <div className="relative">
                 <div className="flex items-center justify-between mb-0.5">
                   <label className="text-[9px] font-bold text-black leading-tight">
-                    Kỳ Bảo Dưỡng <span className="text-emerald-600 font-bold">(+180d)</span>
+                    Ngày Bàn Giao <span className="text-rose-500">*</span>
                   </label>
-                  {nextMaintenanceDate && <span className="text-[8.5px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(nextMaintenanceDate)}</span>}
+                  <span className={`text-[8.5px] font-mono px-1 rounded ${isValidDMY(handoverDate) ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                    dd/MM/yyyy
+                  </span>
                 </div>
                 <input
-                  type="date"
-                  value={nextMaintenanceDate}
-                  onChange={(e) => setNextMaintenanceDate(e.target.value)}
-                  className="w-full px-1.5 py-0.5 text-xs rounded border border-emerald-300 bg-emerald-50/50 text-black font-medium"
+                  type="text"
+                  required
+                  placeholder="dd/MM/yyyy"
+                  maxLength={10}
+                  inputMode="numeric"
+                  pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
+                  title="Định dạng bắt buộc: ngày/tháng/năm (dd/MM/yyyy)"
+                  value={handoverDate}
+                  onChange={(e) => handleHandoverDateChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      !/[\d/]/.test(e.key) &&
+                      !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                      !e.ctrlKey &&
+                      !e.metaKey
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className="w-full pl-2 pr-7 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-semibold font-mono placeholder:font-normal placeholder:text-slate-400"
                 />
+                <div
+                  className="absolute right-1 bottom-0.5 flex items-center justify-center p-0.5 text-slate-500 hover:text-emerald-600 transition rounded"
+                  title="Chọn ngày bàn giao từ lịch"
+                >
+                  <Calendar className="w-3.5 h-3.5 pointer-events-none" />
+                  <input
+                    type="date"
+                    tabIndex={-1}
+                    aria-label="Chọn ngày bàn giao từ lịch"
+                    title="Chọn ngày từ lịch"
+                    value={isValidDMY(handoverDate) ? dmyToISO(handoverDate) : ''}
+                    onClick={(e) => {
+                      try {
+                        if ('showPicker' in e.currentTarget) {
+                          e.currentTarget.showPicker();
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleHandoverDateChange(toDMY(e.target.value));
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                </div>
               </div>
 
-              <div>
+              <div className="relative">
                 <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-[9px] font-bold text-black leading-tight">Hạn Bảo Hành</label>
-                  {warrantyExpiryDate && <span className="text-[8.5px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(warrantyExpiryDate)}</span>}
+                  <label className="text-[9px] font-bold text-black leading-tight">
+                    Kỳ Bảo Dưỡng <span className="text-emerald-600 font-bold">(+180d)</span> <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[8.5px] font-mono px-1 rounded ${isValidDMY(nextMaintenanceDate) ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                    dd/MM/yyyy
+                  </span>
                 </div>
                 <input
-                  type="date"
-                  value={warrantyExpiryDate}
-                  onChange={(e) => setWarrantyExpiryDate(e.target.value)}
-                  className="w-full px-1.5 py-0.5 text-xs rounded border border-slate-200 text-black font-medium"
+                  type="text"
+                  required
+                  placeholder="dd/MM/yyyy"
+                  maxLength={10}
+                  inputMode="numeric"
+                  pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
+                  title="Định dạng bắt buộc: ngày/tháng/năm (dd/MM/yyyy)"
+                  value={nextMaintenanceDate}
+                  onChange={(e) => handleNextMaintenanceDateChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      !/[\d/]/.test(e.key) &&
+                      !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                      !e.ctrlKey &&
+                      !e.metaKey
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className="w-full pl-2 pr-7 py-0.5 text-xs rounded border border-emerald-300 bg-emerald-50/50 focus:outline-emerald-500 focus:border-emerald-500 text-black font-semibold font-mono placeholder:font-normal placeholder:text-slate-400"
                 />
+                <div
+                  className="absolute right-1 bottom-0.5 flex items-center justify-center p-0.5 text-emerald-700 hover:text-emerald-900 transition rounded"
+                  title="Chọn kỳ bảo dưỡng từ lịch"
+                >
+                  <Calendar className="w-3.5 h-3.5 pointer-events-none" />
+                  <input
+                    type="date"
+                    tabIndex={-1}
+                    aria-label="Chọn kỳ bảo dưỡng từ lịch"
+                    title="Chọn ngày từ lịch"
+                    value={isValidDMY(nextMaintenanceDate) ? dmyToISO(nextMaintenanceDate) : ''}
+                    onClick={(e) => {
+                      try {
+                        if ('showPicker' in e.currentTarget) {
+                          e.currentTarget.showPicker();
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleNextMaintenanceDateChange(toDMY(e.target.value));
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-[9px] font-bold text-black leading-tight">
+                    Hạn Bảo Hành <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[8.5px] font-mono px-1 rounded ${isValidDMY(warrantyExpiryDate) ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                    dd/MM/yyyy
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="dd/MM/yyyy"
+                  maxLength={10}
+                  inputMode="numeric"
+                  pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
+                  title="Định dạng bắt buộc: ngày/tháng/năm (dd/MM/yyyy)"
+                  value={warrantyExpiryDate}
+                  onChange={(e) => handleWarrantyExpiryDateChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      !/[\d/]/.test(e.key) &&
+                      !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                      !e.ctrlKey &&
+                      !e.metaKey
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className="w-full pl-2 pr-7 py-0.5 text-xs rounded border border-slate-200 focus:outline-emerald-500 focus:border-emerald-500 text-black font-semibold font-mono placeholder:font-normal placeholder:text-slate-400"
+                />
+                <div
+                  className="absolute right-1 bottom-0.5 flex items-center justify-center p-0.5 text-slate-500 hover:text-emerald-600 transition rounded"
+                  title="Chọn hạn bảo hành từ lịch"
+                >
+                  <Calendar className="w-3.5 h-3.5 pointer-events-none" />
+                  <input
+                    type="date"
+                    tabIndex={-1}
+                    aria-label="Chọn hạn bảo hành từ lịch"
+                    title="Chọn ngày từ lịch"
+                    value={isValidDMY(warrantyExpiryDate) ? dmyToISO(warrantyExpiryDate) : ''}
+                    onClick={(e) => {
+                      try {
+                        if ('showPicker' in e.currentTarget) {
+                          e.currentTarget.showPicker();
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleWarrantyExpiryDateChange(toDMY(e.target.value));
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                </div>
               </div>
 
               <div>

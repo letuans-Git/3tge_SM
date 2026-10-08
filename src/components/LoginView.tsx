@@ -101,13 +101,13 @@ export const LoginView: React.FC = () => {
   const isFirstTimeSetup = !loadingAuth && users.length === 0;
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden select-none">
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden select-none w-full">
       {/* Ambient background glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-20 right-10 w-80 h-80 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
 
       {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
+      <div className="w-full max-w-md mx-auto relative z-10 text-center">
         <SolarLogo className="w-16 h-16 mx-auto mb-3 shadow-xl hover:scale-105 transition-transform" />
         <h1 className="text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
           3TGE SOLAR
@@ -121,7 +121,7 @@ export const LoginView: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div className="mt-6 w-full max-w-md mx-auto relative z-10">
         <div className="bg-white/95 backdrop-blur-md py-7 px-6 shadow-2xl rounded-2xl sm:px-8 border border-slate-200/80 space-y-5">
           
           {/* Header Info */}

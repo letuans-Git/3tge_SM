@@ -54,7 +54,7 @@ function MainApp() {
         isOnline={isOnline}
       />
 
-      <main className="flex-1 max-w-[96rem] w-full mx-auto px-2 sm:px-3 lg:px-4 py-2 sm:py-2.5 pb-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 pb-10">
         {currentTab === 'dashboard' && (
           <Dashboard onNavigateToTab={(tab) => setCurrentTab(tab as NavTab)} />
         )}
@@ -66,8 +66,8 @@ function MainApp() {
       </main>
 
       {/* Compact Clean Footer */}
-      <footer className="bg-white border-t border-slate-200 py-3 px-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="bg-white border-t border-slate-200 py-3 text-xs text-slate-500 w-full mt-auto">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left w-full">
           <div className="flex items-center gap-1.5 font-bold text-slate-700">
             <SolarLogo className="w-4 h-4 rounded-sm border-none shadow-none" />
             <span>3TGE SOLAR SYSTEM</span>

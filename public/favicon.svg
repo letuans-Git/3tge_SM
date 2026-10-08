@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="fav-sky" cx="30%" cy="25%" r="80%">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="60%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </radialGradient>
+    <radialGradient id="fav-sun" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </radialGradient>
+    <linearGradient id="fav-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ADE80" />
+      <stop offset="100%" stop-color="#15803D" />
+    </linearGradient>
+    <linearGradient id="fav-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+  
+  <g transform="translate(6, 6) scale(0.81)">
+    <!-- Sky Circle -->
+    <circle cx="32" cy="32" r="28" fill="url(#fav-sky)" />
+    
+    <!-- Sun -->
+    <circle cx="22" cy="20" r="10" fill="url(#fav-sun)" />
+
+    <!-- Green Leaf Arc -->
+    <path d="M 20 20 C 26 12, 38 8, 48 10 C 56 12, 60 20, 58 28 C 50 20, 38 18, 28 22 Z" fill="url(#fav-green)" />
+    
+    <!-- Blue Energy "3" / Arc -->
+    <path d="M 18 22 L 36 22 C 34 28, 30 32, 26 34 L 22 34 L 20 38 C 24 36, 28 36, 32 38 C 36 40, 37 46, 34 50 C 30 55, 24 55, 18 53 L 20 47 C 22 49, 26 50, 28 48 C 30 46, 30 43, 27 42 C 24 41, 20 43, 18 44 Z" fill="url(#fav-blue)" />
+    <path d="M 38 22 C 45 22, 54 26, 56 35 C 50 44, 42 50, 30 52 C 38 46, 46 38, 48 30 C 44 32, 39 34, 34 38 Z" fill="url(#fav-green)" />
+    
+    <!-- Bottom banner badge -->
+    <rect x="8" y="46" width="48" height="13" rx="6.5" fill="#FFFFFF" />
+    <text x="16" y="56" font-family="system-ui, sans-serif" font-size="10" font-weight="900" font-style="italic" fill="#1E3A8A">3T</text>
+    <text x="31" y="56" font-family="system-ui, sans-serif" font-size="8" font-weight="900" fill="#16A34A">GE</text>
+  </g>
+</svg>

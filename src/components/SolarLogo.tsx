@@ -379,7 +379,7 @@ export const SolarLogo: React.FC<LogoProps> = ({
               fileInputRef.current?.click();
             }}
             className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity cursor-pointer rounded-full"
-            title="Nhấn để tải trực tiếp file Logo Tron.jpg gốc từ máy"
+            title="Nhấn để tải trực tiếp file Logo Vuong.jpg gốc từ máy"
           >
             <Upload className="w-4 h-4" />
             <span className="text-[8px] font-bold mt-0.5">Tải ảnh</span>

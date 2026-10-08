@@ -20,14 +20,16 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
-  Wind
+  Wind,
+  Calendar,
+  ArrowUpDown
 } from 'lucide-react';
 import { Customer, SystemStatus } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { CustomerFormModal } from './CustomerFormModal';
 import { exportCustomersToExcel } from '../utils/exportUtils';
-import { formatDateVN, formatDateTimeVN } from '../utils/dateUtils';
+import { formatDateVN, formatDateTimeVN, dmyToISO } from '../utils/dateUtils';
 
 export const getCustomerPhase = (customer: Customer): string => {
   const phases = customer.inverters?.map(i => i.phase).filter(Boolean) as string[];
@@ -73,6 +75,9 @@ export const CustomersView: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedWarranty, setSelectedWarranty] = useState<string>('ALL');
   const [selectedMaintenanceFilter, setSelectedMaintenanceFilter] = useState<string>('ALL');
+
+  // Sắp xếp danh sách khách hàng: mặc định sắp xếp theo ngày bàn giao giảm dần (mới nhất lên đầu)
+  const [sortBy, setSortBy] = useState<'handoverDate_desc' | 'handoverDate_asc' | 'code_desc' | 'code_asc' | 'name_asc'>('handoverDate_desc');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -141,7 +146,15 @@ export const CustomersView: React.FC = () => {
   const activeCount = customers.filter(c => !c.isDisabled).length;
   const disabledCount = customers.filter(c => c.isDisabled).length;
 
-  // Filter list based on active tab and search filters
+  // Helper chuyển đổi ngày (dd/mm/yyyy hoặc yyyy-mm-dd) thành timestamp an toàn để sắp xếp chính xác
+  const parseDateToTimestamp = (dateStr?: string | null): number => {
+    if (!dateStr) return 0;
+    const iso = dmyToISO(dateStr);
+    const t = new Date(iso).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  // Filter list based on active tab and search filters, sau đó sắp xếp theo ngày bàn giao giảm dần
   const filteredCustomers = customers.filter(c => {
     // 1. Tab filter
     if (activeTab === 'ACTIVE' && c.isDisabled) return false;
@@ -187,6 +200,29 @@ export const CustomersView: React.FC = () => {
     }
 
     return true;
+  }).sort((a, b) => {
+    if (sortBy === 'handoverDate_desc') {
+      const tA = parseDateToTimestamp(a.handoverDate);
+      const tB = parseDateToTimestamp(b.handoverDate);
+      if (tB !== tA) return tB - tA; // Giảm dần: Ngày bàn giao mới nhất lên đầu
+      return (b.customerCode || '').localeCompare(a.customerCode || '');
+    }
+    if (sortBy === 'handoverDate_asc') {
+      const tA = parseDateToTimestamp(a.handoverDate);
+      const tB = parseDateToTimestamp(b.handoverDate);
+      if (tA !== tB) return tA - tB; // Tăng dần: Ngày bàn giao cũ nhất lên đầu
+      return (a.customerCode || '').localeCompare(b.customerCode || '');
+    }
+    if (sortBy === 'code_desc') {
+      return (b.customerCode || '').localeCompare(a.customerCode || '');
+    }
+    if (sortBy === 'code_asc') {
+      return (a.customerCode || '').localeCompare(b.customerCode || '');
+    }
+    if (sortBy === 'name_asc') {
+      return (a.customerName || '').localeCompare(b.customerName || '', 'vi');
+    }
+    return 0;
   });
 
   const getStatusBadge = (status: SystemStatus, isDisabled?: boolean) => {
@@ -381,7 +417,7 @@ export const CustomersView: React.FC = () => {
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {/* Text Search */}
           <div className="relative lg:col-span-2">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
@@ -392,6 +428,22 @@ export const CustomersView: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 rounded-md border border-slate-200 focus:bg-white focus:outline-emerald-500"
             />
+          </div>
+
+          {/* Sắp xếp danh sách (Mặc định: Ngày bàn giao giảm dần) */}
+          <div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="w-full px-2 py-1.5 text-xs bg-slate-50 rounded-md border border-slate-200 font-semibold text-slate-700 focus:bg-white focus:outline-emerald-500"
+              title="Thứ tự sắp xếp danh sách"
+            >
+              <option value="handoverDate_desc">📅 Bàn giao (Mới nhất ↓)</option>
+              <option value="handoverDate_asc">📅 Bàn giao (Cũ nhất ↑)</option>
+              <option value="code_desc">Mã KH (Giảm dần)</option>
+              <option value="code_asc">Mã KH (Tăng dần)</option>
+              <option value="name_asc">Tên KH (A - Z)</option>
+            </select>
           </div>
 
           {/* Province Filter */}
@@ -447,6 +499,26 @@ export const CustomersView: React.FC = () => {
               <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase font-bold text-[9.5px] tracking-wider leading-none">
                 <th className="py-1 px-2">Mã KH</th>
                 <th className="py-1 px-2">Khách Hàng & Liên Hệ</th>
+                <th 
+                  className="py-1 px-2 cursor-pointer select-none group hover:bg-slate-100 transition whitespace-nowrap"
+                  onClick={() => setSortBy(prev => prev === 'handoverDate_desc' ? 'handoverDate_asc' : 'handoverDate_desc')}
+                  title="Nhấn để đổi chiều sắp xếp theo ngày bàn giao"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Ngày Bàn Giao</span>
+                    {sortBy === 'handoverDate_desc' ? (
+                      <span className="text-emerald-700 font-black text-[10px] flex items-center gap-0.5" title="Giảm dần (Mới nhất)">
+                        ↓ <span className="text-[8px] font-normal normal-case">giảm dần</span>
+                      </span>
+                    ) : sortBy === 'handoverDate_asc' ? (
+                      <span className="text-emerald-700 font-black text-[10px] flex items-center gap-0.5" title="Tăng dần (Cũ nhất)">
+                        ↑ <span className="text-[8px] font-normal normal-case">tăng dần</span>
+                      </span>
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+                    )}
+                  </div>
+                </th>
                 <th className="py-1 px-2">Địa Chỉ & Hợp Đồng</th>
                 <th className="py-1 px-2">Biến Tần & Pin Lưu Trữ</th>
                 <th className="py-1 px-2">Công Suất</th>
@@ -458,7 +530,7 @@ export const CustomersView: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-slate-400">
+                  <td colSpan={9} className="py-4 text-center text-slate-400">
                     {activeTab === 'ACTIVE' 
                       ? 'Không tìm thấy khách hàng nào khớp với điều kiện tìm kiếm.'
                       : 'Hiện không có khách hàng nào trong danh sách bị vô hiệu hóa.'}
@@ -478,6 +550,12 @@ export const CustomersView: React.FC = () => {
                       <div className="text-[10px] text-slate-500 flex items-center gap-1 leading-none mt-0.5">
                         <Phone className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                         {c.phoneNumber}
+                      </div>
+                    </td>
+                    <td className="py-1 px-2 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>{formatDateVN(c.handoverDate, '—')}</span>
                       </div>
                     </td>
                     <td className="py-1 px-2 max-w-[200px]">
@@ -650,6 +728,13 @@ export const CustomersView: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span className="truncate">{c.address}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] bg-emerald-50/70 border border-emerald-100/80 px-2 py-0.5 rounded text-emerald-800">
+                    <span className="flex items-center gap-1 font-semibold">
+                      <Calendar className="w-3 h-3 text-emerald-600" />
+                      Ngày bàn giao:
+                    </span>
+                    <strong className="text-emerald-900 font-bold">{formatDateVN(c.handoverDate, '—')}</strong>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">

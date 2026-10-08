@@ -22,7 +22,14 @@ import { Customer, MaintenanceRecord } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { exportMaintenanceToExcel } from '../utils/exportUtils';
-import { formatDateVN, generateMaintenanceCode } from '../utils/dateUtils';
+import { 
+  formatDateVN, 
+  generateMaintenanceCode,
+  toDMY,
+  dmyToISO,
+  isValidDMY,
+  formatDMYInput
+} from '../utils/dateUtils';
 import { MaintenancePrintModal } from './MaintenancePrintModal';
 
 export const MaintenanceView: React.FC = () => {
@@ -47,6 +54,20 @@ export const MaintenanceView: React.FC = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [technicianName, setTechnicianName] = useState(currentUser?.fullName.split(' - ')[0] || 'Nguyễn Văn Hùng');
   const [maintenanceDate, setMaintenanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [maintenanceDateDMY, setMaintenanceDateDMY] = useState(toDMY(new Date()));
+
+  const updateMaintenanceDate = (val: string, isDmy = false) => {
+    if (isDmy) {
+      const formatted = formatDMYInput(val);
+      setMaintenanceDateDMY(formatted);
+      if (isValidDMY(formatted)) {
+        setMaintenanceDate(dmyToISO(formatted));
+      }
+    } else {
+      setMaintenanceDate(val);
+      setMaintenanceDateDMY(toDMY(val));
+    }
+  };
   const [content, setContent] = useState('');
   const [inspectionResult, setInspectionResult] = useState('Hệ thống hoạt động bình thường, điện áp DC và AC ổn định.');
   const [recommendations, setRecommendations] = useState('Vệ sinh bề mặt tấm pin định kỳ sau 6 tháng. Kiểm tra dây siết bu lông.');
@@ -137,9 +158,10 @@ export const MaintenanceView: React.FC = () => {
     if (targetCust) {
       setSelectedCustomerId(targetCust.id);
       // Initialize maintenanceDate with customer's current/old scheduled maintenance date (or today if none)
-      setMaintenanceDate(targetCust.nextMaintenanceDate || new Date().toISOString().split('T')[0]);
+      const initDate = targetCust.nextMaintenanceDate || new Date().toISOString().split('T')[0];
+      updateMaintenanceDate(initDate, false);
     } else {
-      setMaintenanceDate(new Date().toISOString().split('T')[0]);
+      updateMaintenanceDate(new Date().toISOString().split('T')[0], false);
     }
     setTechnicianName(currentUser?.fullName.split(' - ')[0] || 'Nguyễn Văn Hùng');
     setContent('Kiểm tra biến tần, siết các đầu nối MC4, đo điện áp chuỗi pin PV, vệ sinh tấm pin và lọc gió inverter.');
@@ -155,7 +177,7 @@ export const MaintenanceView: React.FC = () => {
     const matchedCust = customers.find(c => c.id === rec.customerId || c.customerCode === rec.customerCode);
     setSelectedCustomerId(matchedCust?.id || rec.customerId || '');
     setTechnicianName(rec.technicianName);
-    setMaintenanceDate(rec.maintenanceDate);
+    updateMaintenanceDate(rec.maintenanceDate, false);
     setContent(rec.content);
     setInspectionResult(rec.inspectionResult);
     setRecommendations(rec.recommendations);
@@ -564,18 +586,65 @@ export const MaintenanceView: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
+                <div className="relative">
                   <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[9.5px] font-bold text-black leading-tight">Ngày Bảo Dưỡng (Ngày Cũ)</label>
-                    {maintenanceDate && <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(maintenanceDate)}</span>}
+                    <label className="text-[9.5px] font-bold text-black leading-tight">
+                      Ngày Bảo Dưỡng (Ngày Cũ) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[8.5px] font-mono px-1 rounded ${isValidDMY(maintenanceDateDMY) ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                      dd/MM/yyyy
+                    </span>
                   </div>
                   <input
-                    type="date"
-                    value={maintenanceDate}
-                    onChange={(e) => setMaintenanceDate(e.target.value)}
-                    className="w-full px-2 py-0.5 text-xs rounded border border-slate-200 text-black font-medium"
+                    type="text"
                     required
+                    placeholder="dd/MM/yyyy"
+                    maxLength={10}
+                    inputMode="numeric"
+                    pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
+                    title="Định dạng bắt buộc: ngày/tháng/năm (dd/MM/yyyy)"
+                    value={maintenanceDateDMY}
+                    onChange={(e) => updateMaintenanceDate(e.target.value, true)}
+                    onKeyDown={(e) => {
+                      if (
+                        !/[\d/]/.test(e.key) &&
+                        !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                        !e.ctrlKey &&
+                        !e.metaKey
+                      ) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className="w-full pl-2 pr-7 py-0.5 text-xs rounded border border-slate-200 text-black font-semibold font-mono placeholder:font-normal placeholder:text-slate-400 focus:outline-emerald-500"
                   />
+                  <div
+                    className="absolute right-1 bottom-0.5 flex items-center justify-center p-0.5 text-slate-500 hover:text-emerald-600 transition rounded cursor-pointer"
+                    title="Chọn ngày bảo dưỡng từ lịch"
+                  >
+                    <Calendar className="w-3.5 h-3.5 pointer-events-none" />
+                    <input
+                      type="date"
+                      tabIndex={-1}
+                      aria-label="Chọn ngày bảo dưỡng từ lịch"
+                      title="Chọn ngày bảo dưỡng từ lịch"
+                      value={isValidDMY(maintenanceDateDMY) ? dmyToISO(maintenanceDateDMY) : ''}
+                      onClick={(e) => {
+                        try {
+                          if ('showPicker' in e.currentTarget) {
+                            e.currentTarget.showPicker();
+                          }
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          updateMaintenanceDate(e.target.value, false);
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
                 </div>
 
                 <div>

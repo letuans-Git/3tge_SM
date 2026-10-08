@@ -17,7 +17,13 @@ import { CashTransaction, CashFlowType, CashFlowCategory } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { exportCashFlowToExcel } from '../utils/exportUtils';
-import { formatDateVN } from '../utils/dateUtils';
+import { 
+  formatDateVN,
+  toDMY,
+  dmyToISO,
+  isValidDMY,
+  formatDMYInput
+} from '../utils/dateUtils';
 import { SolarLogo } from './SolarLogo';
 
 const THU_CATEGORIES: CashFlowCategory[] = [
@@ -52,6 +58,20 @@ export const CashFlowView: React.FC = () => {
   const [customerRefCode, setCustomerRefCode] = useState('');
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dateDMY, setDateDMY] = useState(toDMY(new Date()));
+
+  const updateDate = (val: string, isDmy = false) => {
+    if (isDmy) {
+      const formatted = formatDMYInput(val);
+      setDateDMY(formatted);
+      if (isValidDMY(formatted)) {
+        setDate(dmyToISO(formatted));
+      }
+    } else {
+      setDate(val);
+      setDateDMY(toDMY(val));
+    }
+  };
 
   // Statistics
   const totalThu = cashTransactions.filter(t => t.type === 'THU').reduce((s, t) => s + t.amount, 0);
@@ -79,6 +99,8 @@ export const CashFlowView: React.FC = () => {
     setCustomerRefCode('');
     setNotes('');
     setAmount(1000000);
+    const todayISO = new Date().toISOString().split('T')[0];
+    updateDate(todayISO, false);
     setIsModalOpen(true);
   };
 
@@ -356,18 +378,65 @@ export const CashFlowView: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
+                <div className="relative">
                   <div className="flex items-center justify-between mb-1">
-                    <label className="font-bold text-black">Ngày Giao Dịch</label>
-                    {date && <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{formatDateVN(date)}</span>}
+                    <label className="font-bold text-black">
+                      Ngày Giao Dịch <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono px-1 rounded ${isValidDMY(dateDMY) ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-100'}`}>
+                      dd/MM/yyyy
+                    </span>
                   </div>
                   <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-black font-medium"
+                    type="text"
                     required
+                    placeholder="dd/MM/yyyy"
+                    maxLength={10}
+                    inputMode="numeric"
+                    pattern="^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$"
+                    title="Định dạng bắt buộc: ngày/tháng/năm (dd/MM/yyyy)"
+                    value={dateDMY}
+                    onChange={(e) => updateDate(e.target.value, true)}
+                    onKeyDown={(e) => {
+                      if (
+                        !/[\d/]/.test(e.key) &&
+                        !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', 'Escape'].includes(e.key) &&
+                        !e.ctrlKey &&
+                        !e.metaKey
+                      ) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-black font-semibold font-mono placeholder:font-normal placeholder:text-slate-400"
                   />
+                  <div
+                    className="absolute right-2 bottom-2 flex items-center justify-center p-1 text-slate-500 hover:text-emerald-600 transition rounded cursor-pointer"
+                    title="Chọn ngày giao dịch từ lịch"
+                  >
+                    <Calendar className="w-4 h-4 pointer-events-none" />
+                    <input
+                      type="date"
+                      tabIndex={-1}
+                      aria-label="Chọn ngày giao dịch từ lịch"
+                      title="Chọn ngày giao dịch từ lịch"
+                      value={isValidDMY(dateDMY) ? dmyToISO(dateDMY) : ''}
+                      onClick={(e) => {
+                        try {
+                          if ('showPicker' in e.currentTarget) {
+                            e.currentTarget.showPicker();
+                          }
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          updateDate(e.target.value, false);
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
                 </div>
               </div>
 
