@@ -1123,38 +1123,29 @@ export const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
   }
 ];
 
-// Helper to seed initial business collections if empty (Customers, Inventory, etc.)
-// Also ensures at least 36 customers exist so pagination can be fully tested and experienced.
+// Helper to seed initial business collections if empty (Inventory, Cash Transactions, etc.)
+// Sample customers are no longer seeded into the database
 export async function seedExtendedCustomersBatch() {
-  try {
-    const promises = INITIAL_CUSTOMERS.map(cust => setDoc(doc(db, 'customers', cust.id), cust, { merge: true }));
-    await Promise.all(promises);
-    return true;
-  } catch (err) {
-    console.error('seedExtendedCustomersBatch error:', err);
-    return false;
-  }
+  return true;
 }
 
 export async function seedInitialDatabaseIfEmpty() {
   try {
-    const custRef = collection(db, 'customers');
-    const custSnap = await getDocs(custRef);
+    const invRef = collection(db, 'inventory');
+    const invSnap = await getDocs(invRef);
     
-    // If database already has full dataset (at least 12 customers), mark as initialized
-    if (!custSnap.empty && custSnap.size >= 12) {
+    // If inventory already initialized, skip
+    if (!invSnap.empty) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('3tge_db_initialized', 'true');
       }
       return;
     }
 
-    // If database is empty or has fewer than 12 customers, seed or complement full INITIAL_CUSTOMERS
+    // Seed basic inventory and initial transactions only if inventory is completely empty (no sample customers)
     await Promise.all([
-      ...INITIAL_CUSTOMERS.map(cust => setDoc(doc(db, 'customers', cust.id), cust, { merge: true })),
       ...INITIAL_INVENTORY.map(item => setDoc(doc(db, 'inventory', item.id), item, { merge: true })),
-      ...INITIAL_CASH_TRANSACTIONS.map(cash => setDoc(doc(db, 'cashTransactions', cash.id), cash, { merge: true })),
-      ...INITIAL_MAINTENANCE.map(m => setDoc(doc(db, 'maintenanceRecords', m.id), m, { merge: true }))
+      ...INITIAL_CASH_TRANSACTIONS.map(cash => setDoc(doc(db, 'cashTransactions', cash.id), cash, { merge: true }))
     ]);
 
     if (typeof window !== 'undefined') {

@@ -27,7 +27,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Sparkles,
   Layers,
   Zap,
   ArrowRight,
@@ -81,8 +80,7 @@ export const CustomersView: React.FC = () => {
     restoreCustomer, 
     deleteCustomer, 
     generateNextCustomerCode, 
-    sendMaintenanceNotification,
-    seedDemoCustomersBatch
+    sendMaintenanceNotification
   } = useData();
   const { currentUser, hasRole, hasPermission } = useAuth();
 
@@ -111,7 +109,6 @@ export const CustomersView: React.FC = () => {
   });
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [jumpPageInput, setJumpPageInput] = useState<string>('');
-  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -334,23 +331,6 @@ export const CustomersView: React.FC = () => {
       setJumpPageInput('');
       scrollToTableTop();
       showToast(`Đã chuyển đến trang ${target}`, 'info');
-    }
-  };
-
-  const handleSeedDemoData = async () => {
-    setIsSeedingDemo(true);
-    try {
-      const ok = await seedDemoCustomersBatch();
-      if (ok) {
-        showToast('Nạp thành công bộ 36 hồ sơ khách hàng mẫu chuẩn hóa đa trang!', 'success');
-      } else {
-        showToast('Không thể nạp dữ liệu mẫu. Vui lòng kiểm tra kết nối!', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('Có lỗi xảy ra khi nạp dữ liệu mẫu.', 'error');
-    } finally {
-      setIsSeedingDemo(false);
     }
   };
 
@@ -676,19 +656,6 @@ export const CustomersView: React.FC = () => {
             <span className="sm:hidden">Auto Zalo</span>
           </a>
 
-          {/* Nút nạp 36 KH mẫu để kiểm tra phân trang đa trang */}
-          <button
-            type="button"
-            onClick={handleSeedDemoData}
-            disabled={isSeedingDemo}
-            title="Nạp 36 hồ sơ khách hàng mẫu chuẩn hóa để trải nghiệm phân trang thông minh"
-            className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span className="hidden sm:inline">Nạp 36 KH mẫu</span>
-            <span className="sm:hidden">36 KH</span>
-          </button>
-
           {hasPermission('customer_export') && (
             <button
               type="button"
@@ -751,27 +718,6 @@ export const CustomersView: React.FC = () => {
               Bạn có thể <strong>Khôi phục</strong> để đưa khách hàng trở lại hoạt động, hoặc chỉ thực hiện <strong>Xóa vĩnh viễn</strong> tại đây nếu thực sự cần thiết.
             </p>
           </div>
-        </div>
-      )}
-
-      {/* Info notice for small dataset to test smart pagination */}
-      {activeTab === 'ACTIVE' && customers.length < 12 && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 rounded-lg p-2 px-3 text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 animate-bounce" />
-            <span className="text-[11.5px]">
-              Hiện đang có <strong>{customers.length}</strong> khách hàng trong cơ sở dữ liệu. Nhấn <strong>"Nạp 36 KH mẫu"</strong> để ngay lập tức trải nghiệm hệ thống phân trang thông minh đa trang (chuẩn hóa quản lý hàng nghìn khách hàng).
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleSeedDemoData}
-            disabled={isSeedingDemo}
-            className="shrink-0 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md text-xs transition cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 flex items-center gap-1.5 self-start sm:self-auto"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Nạp 36 KH mẫu ngay
-          </button>
         </div>
       )}
 
