@@ -39,6 +39,12 @@ export type PermissionAction =
   | 'reports_view'
   | 'reports_export_excel'
 
+  // Danh mục hệ thống (Master Data)
+  | 'catalog_view'
+  | 'catalog_item_manage'
+  | 'catalog_expense_manage'
+  | 'catalog_supplier_manage'
+
   // Quản trị hệ thống & Phân quyền
   | 'users_view'
   | 'users_create'
@@ -141,6 +147,17 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { id: 'users_delete', name: 'Xóa tài khoản nhân viên', description: 'Thu hồi và xóa tài khoản nhân viên khỏi hệ thống' },
       { id: 'roles_configure', name: 'Cấu hình ma trận phân quyền', description: 'Tùy chỉnh nhóm quyền cho từng vai trò trên Firestore' },
     ]
+  },
+  {
+    groupId: 'catalog',
+    groupName: '8. Quản Lý Danh Mục (Master Data)',
+    description: 'Quản lý danh mục vật tư hàng hóa, danh mục chi phí, danh mục nhà cung cấp',
+    permissions: [
+      { id: 'catalog_view', name: 'Xem menu Danh mục', description: 'Tra cứu danh mục vật tư, chi phí, nhà cung cấp' },
+      { id: 'catalog_item_manage', name: 'Quản lý danh mục vật tư', description: 'Nhập, sửa, xóa vật tư (chỉ xóa khi chưa dùng)' },
+      { id: 'catalog_expense_manage', name: 'Quản lý danh mục chi phí', description: 'Nhập, sửa, xóa loại chi phí (chỉ xóa khi chưa dùng)' },
+      { id: 'catalog_supplier_manage', name: 'Quản lý danh mục nhà cung cấp', description: 'Nhập, sửa, xóa nhà cung cấp (chỉ xóa khi chưa dùng)' },
+    ]
   }
 ];
 
@@ -166,6 +183,7 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       'inventory_view', 'inventory_import', 'inventory_export', 'inventory_item_create', 'inventory_item_edit', 'inventory_excel_export',
       'cashflow_view', 'cashflow_receipt_create', 'cashflow_payment_create', 'cashflow_delete', 'cashflow_excel_export',
       'reports_view', 'reports_export_excel',
+      'catalog_view', 'catalog_item_manage', 'catalog_expense_manage', 'catalog_supplier_manage',
       'users_view', 'users_create', 'users_edit', 'users_delete', 'roles_configure'
     ]
   },
@@ -179,7 +197,8 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       'customer_view', 'customer_edit', 'customer_export',
       'maintenance_schedule_view', 'maintenance_record_create', 'maintenance_record_edit', 'maintenance_record_delete', 'maintenance_record_view', 'maintenance_notify_send', 'maintenance_pdf_export',
       'inventory_view', 'inventory_export',
-      'reports_view'
+      'reports_view',
+      'catalog_view', 'catalog_item_manage'
     ]
   },
   cskh: {
@@ -192,7 +211,8 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       'customer_view', 'customer_create', 'customer_edit', 'customer_export',
       'maintenance_schedule_view', 'maintenance_notify_send', 'maintenance_record_view',
       'cashflow_view', 'cashflow_receipt_create', 'cashflow_payment_create', 'cashflow_excel_export',
-      'reports_view'
+      'reports_view',
+      'catalog_view', 'catalog_expense_manage', 'catalog_supplier_manage'
     ]
   }
 };

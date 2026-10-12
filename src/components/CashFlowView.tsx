@@ -42,7 +42,7 @@ const CHI_CATEGORIES: CashFlowCategory[] = [
 ];
 
 export const CashFlowView: React.FC = () => {
-  const { cashTransactions, addCashTransaction, deleteCashTransaction, customers } = useData();
+  const { cashTransactions, addCashTransaction, deleteCashTransaction, customers, expenseCategories } = useData();
   const { currentUser, hasRole, hasPermission } = useAuth();
 
   const [filterType, setFilterType] = useState<'ALL' | 'THU' | 'CHI'>('ALL');
@@ -447,7 +447,10 @@ export const CashFlowView: React.FC = () => {
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 text-black font-medium"
                 >
-                  {(type === 'THU' ? THU_CATEGORIES : CHI_CATEGORIES).map(cat => (
+                  {(type === 'THU' 
+                    ? THU_CATEGORIES 
+                    : (expenseCategories.length > 0 ? expenseCategories.map(c => c.name) : CHI_CATEGORIES)
+                  ).map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>

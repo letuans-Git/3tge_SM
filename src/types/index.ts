@@ -140,6 +140,50 @@ export interface InventoryTransaction {
   notes?: string;
   createdBy: string;
   date: string;
+  receiptId?: string;
+  receiptCode?: string;
+  delivererName?: string;
+  warehouseName?: string;
+  invoiceNumber?: string;
+}
+
+// Chi tiết mặt hàng trong Phiếu nhập kho đa mặt hàng
+export interface GoodsReceiptItem {
+  id?: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  category?: ItemCategory;
+  brand?: string;
+  unit: string;
+  docQuantity: number; // Số lượng theo chứng từ
+  actualQuantity: number; // Số lượng thực nhập
+  unitPrice: number;
+  totalAmount: number;
+  notes?: string;
+}
+
+// Phiếu nhập kho hoàn chỉnh (Mẫu số 01 - VT theo TT 200/2014/TT-BTC)
+export interface GoodsReceiptNote {
+  id: string;
+  receiptCode: string; // PN0001 / PN-2026-0001
+  date: string; // YYYY-MM-DD
+  supplierId?: string;
+  supplierName: string;
+  supplierPhone?: string;
+  supplierAddress?: string;
+  supplierTaxCode?: string;
+  delivererName: string; // Họ tên người giao hàng
+  warehouseName: string; // Kho nhập (Kho chính 3TGE, Kho A, Kho B...)
+  warehouseLocation?: string; // Địa điểm kho
+  invoiceNumber?: string; // Hóa đơn / Chứng từ kèm theo
+  reason?: string; // Lý do nhập kho
+  items: GoodsReceiptItem[];
+  totalQuantity: number;
+  totalAmount: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 // Thu - Chi & Quỹ tiền mặt
@@ -168,6 +212,33 @@ export interface CashTransaction {
   createdBy: string;
   date: string;
   createdAt: string;
+}
+
+// Danh mục chi phí (Expense Category)
+export interface ExpenseCategory {
+  id: string;
+  code: string; // CP0001, CP0002...
+  name: string; // Tên loại chi phí
+  group: string; // Nhóm chi phí: Vận hành, Mua sắm, Nhân sự, Quản lý, Marketing...
+  description?: string; // Diễn giải
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Danh mục nhà cung cấp (Supplier)
+export interface Supplier {
+  id: string;
+  code: string; // NCC0001, NCC0002...
+  name: string; // Tên công ty / nhà cung cấp
+  contactPerson?: string; // Người liên hệ
+  phone: string; // SĐT liên hệ
+  email?: string;
+  address?: string;
+  taxCode?: string; // Mã số thuế
+  productGroup?: string; // Nhóm hàng cung ứng (Inverter, Pin, Tấm pin PV, Cáp...)
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 // Notification & Activity Log

@@ -8,6 +8,7 @@ import { MaintenanceView } from './components/MaintenanceView';
 import { InventoryView } from './components/InventoryView';
 import { CashFlowView } from './components/CashFlowView';
 import { ReportsView } from './components/ReportsView';
+import { CatalogView, CatalogSubTab } from './components/CatalogView';
 import { LoginView } from './components/LoginView';
 import { PhoneCall, ShieldCheck, Sun } from 'lucide-react';
 import { SolarLogo } from './components/SolarLogo';
@@ -16,8 +17,16 @@ function MainApp() {
   const { currentUser, loadingAuth } = useAuth();
   const { isOnline } = useData();
   const [currentTab, setCurrentTab] = useState<NavTab>('customers');
+  const [catalogSubTab, setCatalogSubTab] = useState<CatalogSubTab>('items');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const prevUserIdRef = React.useRef<string | null>(null);
+
+  const handleSelectTab = (tab: NavTab, subTab?: CatalogSubTab) => {
+    if (subTab) {
+      setCatalogSubTab(subTab);
+    }
+    setCurrentTab(tab);
+  };
 
   // When user signs in or switches accounts, default directly to customer management
   React.useEffect(() => {
@@ -48,7 +57,7 @@ function MainApp() {
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Navbar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
         isOnline={isOnline}
@@ -62,6 +71,7 @@ function MainApp() {
         {currentTab === 'maintenance' && <MaintenanceView />}
         {currentTab === 'inventory' && <InventoryView />}
         {currentTab === 'cashflow' && <CashFlowView />}
+        {currentTab === 'catalog' && <CatalogView initialSubTab={catalogSubTab} />}
         {currentTab === 'reports' && <ReportsView />}
       </main>
 

@@ -18,7 +18,10 @@ import {
   CashTransaction,
   NotificationLog,
   ActivityLog,
-  UserProfile
+  UserProfile,
+  ExpenseCategory,
+  Supplier,
+  GoodsReceiptNote
 } from '../types';
 
 // Initial users stored in Firestore 'users' collection
@@ -981,73 +984,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
   }
 ];
 
-export const INITIAL_INVENTORY: InventoryItem[] = [
-  {
-    id: 'inv_item_1',
-    code: 'VT-INV-001',
-    name: 'Biến tần Hybrid Huawei SUN2000-10KTL',
-    category: 'INVERTER',
-    brand: 'HUAWEI',
-    unit: 'Bộ',
-    stockQuantity: 8,
-    minAlertQuantity: 3,
-    unitPrice: 42000000,
-    location: 'Kho A - Kệ 01',
-    notes: 'Chính hãng bảo hành 5 năm'
-  },
-  {
-    id: 'inv_item_2',
-    code: 'VT-INV-002',
-    name: 'Biến tần Hybrid Deye SUN-12K-SG04LP3',
-    category: 'INVERTER',
-    brand: 'DEYE',
-    unit: 'Bộ',
-    stockQuantity: 12,
-    minAlertQuantity: 5,
-    unitPrice: 48500000,
-    location: 'Kho A - Kệ 02',
-    notes: 'Hỗ trợ máy phát, ac coupling'
-  },
-  {
-    id: 'inv_item_3',
-    code: 'VT-BAT-001',
-    name: 'Pin Lưu Trữ Lithium Pylontech US5000 48V 100Ah',
-    category: 'BATTERY',
-    brand: 'PYLONTECH',
-    unit: 'Bộ',
-    stockQuantity: 15,
-    minAlertQuantity: 4,
-    unitPrice: 28500000,
-    location: 'Kho B - Kệ 01',
-    notes: 'Dung lượng 4.8kWh, vòng đời 6000 chu kỳ'
-  },
-  {
-    id: 'inv_item_4',
-    code: 'VT-PAN-001',
-    name: 'Tấm pin quang điện Longi Hi-MO 6 Explorer 580W',
-    category: 'PANEL',
-    brand: 'LONGI',
-    unit: 'Tấm',
-    stockQuantity: 240,
-    minAlertQuantity: 60,
-    unitPrice: 1750000,
-    location: 'Kho Bãi số 1',
-    notes: 'Hiệu suất cao 22.5%, bảo hành 12 năm vật lý'
-  },
-  {
-    id: 'inv_item_5',
-    code: 'VT-CAB-001',
-    name: 'Cáp điện năng lượng mặt trời DC Solar 1x4.0mm² Leader',
-    category: 'CABLE',
-    brand: 'LEADER',
-    unit: 'Cuộn (100m)',
-    stockQuantity: 45,
-    minAlertQuantity: 10,
-    unitPrice: 1250000,
-    location: 'Kho C - Ngăn phụ kiện',
-    notes: 'Chống tia UV tiêu chuẩn TUV'
-  }
-];
+export const INITIAL_INVENTORY: InventoryItem[] = [];
 
 export const INITIAL_CASH_TRANSACTIONS: CashTransaction[] = [
   {
@@ -1123,35 +1060,226 @@ export const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
   }
 ];
 
-// Helper to seed initial business collections if empty (Inventory, Cash Transactions, etc.)
-// Sample customers are no longer seeded into the database
+// Danh mục chi phí ban đầu
+export const INITIAL_EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  {
+    id: 'exp_cat_001',
+    code: 'CP0001',
+    name: 'Chi nhập thiết bị',
+    group: 'Mua sắm & Thiết bị',
+    description: 'Chi phí mua biến tần inverter, pin lưu trữ, tấm pin PV',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_002',
+    code: 'CP0002',
+    name: 'Chi lương nhân viên',
+    group: 'Chi phí nhân sự',
+    description: 'Lương cố định, phụ cấp công trình và thưởng kỹ thuật',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_003',
+    code: 'CP0003',
+    name: 'Chi xăng xe đi lại',
+    group: 'Vận hành & Đi lại',
+    description: 'Xăng xe, vé cầu đường, chi phí công tác khảo sát và bảo trì',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_004',
+    code: 'CP0004',
+    name: 'Chi bảo hành/sửa chữa',
+    group: 'Dịch vụ kỹ thuật',
+    description: 'Chi phí thay thế linh kiện, dịch vụ bảo trì định kỳ',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_005',
+    code: 'CP0005',
+    name: 'Chi văn phòng & tiếp khách',
+    group: 'Chi phí quản lý',
+    description: 'Văn phòng phẩm, tiếp đón khách hàng, đối tác năng lượng',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_006',
+    code: 'CP0006',
+    name: 'Chi quảng cáo & marketing',
+    group: 'Bán hàng & Tiếp thị',
+    description: 'Chi phí quảng bá thương hiệu, website, triển lãm điện mặt trời',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_007',
+    code: 'CP0007',
+    name: 'Chi phí viễn thông & SIM 4G',
+    group: 'Vận hành trạm',
+    description: 'Cước mạng 4G giám sát inverter từ xa, tổng đài CSKH',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'exp_cat_008',
+    code: 'CP0008',
+    name: 'Chi khác',
+    group: 'Chi phí khác',
+    description: 'Các khoản chi phí đột xuất khác',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  }
+];
+
+// Danh mục nhà cung cấp ban đầu
+export const INITIAL_SUPPLIERS: Supplier[] = [
+  {
+    id: 'sup_001',
+    code: 'NCC0001',
+    name: 'HTPRO189 Solar Distributor',
+    contactPerson: 'Mr. Hoàng Tuấn',
+    phone: '0918.888.189',
+    email: 'sales@htpro189.vn',
+    address: '120 Võ Văn Kiệt, P. Cầu Ông Lãnh, Quận 1, TP. HCM',
+    taxCode: '0314567890',
+    productGroup: 'Inverter Huawei, Deye, Pin lithium',
+    notes: 'Tổng đại lý phân phối chính thức Huawei & Deye khu vực phía Nam',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'sup_002',
+    code: 'NCC0002',
+    name: 'Hừng Đông Solar & Storage',
+    contactPerson: 'Ms. Mai Phương',
+    phone: '0903.123.456',
+    email: 'contact@hungdongsolar.com',
+    address: 'KCN Tân Bình, Đường Tây Thạnh, P. 15, Tân Phú, TP. HCM',
+    taxCode: '0315678901',
+    productGroup: 'Inverter Sungrow, Pin Pylontech',
+    notes: 'Đối tác chiến lược cung ứng pin lithium Pylontech và inverter hòa lưới',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'sup_003',
+    code: 'NCC0003',
+    name: 'Alena Energy Technology',
+    contactPerson: 'Mr. Phan Nam',
+    phone: '0938.999.222',
+    email: 'info@alena-energy.com',
+    address: '167 Nguyễn Xí, Phường 26, Bình Thạnh, TP. HCM',
+    taxCode: '0313888999',
+    productGroup: 'Tấm pin PV Longi, Inverter Growatt',
+    notes: 'Kho bãi sẵn hàng tấm pin công suất lớn 550W - 580W',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'sup_004',
+    code: 'NCC0004',
+    name: 'Canadian Solar Vietnam',
+    contactPerson: 'Mr. David Lee',
+    phone: '0909.555.777',
+    email: 'vietnam@canadiansolar.com',
+    address: 'Tầng 18 Tòa nhà Bitexco, Bến Nghé, Quận 1, TP. HCM',
+    taxCode: '0316777888',
+    productGroup: 'Tấm pin quang điện PV Tier 1',
+    notes: 'Nhà sản xuất tấm pin chất lượng cao tiêu chuẩn quốc tế',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'sup_005',
+    code: 'NCC0005',
+    name: 'Cadivi - Cáp Điện Việt Nam',
+    contactPerson: 'Lê Minh Trí',
+    phone: '028.3829.2971',
+    email: 'cadivi@cadivi.vn',
+    address: '70-72 Nam Kỳ Khởi Nghĩa, P. Nguyễn Thái Bình, Q. 1, TP. HCM',
+    taxCode: '0300381564',
+    productGroup: 'Cáp điện Solar DC, Dây tiếp địa, Cáp AC',
+    notes: 'Cáp điện đồng nguyên chất cách điện XLPO chống tia cực tím',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  }
+];
+
+// Phiếu nhập kho: Không sử dụng dữ liệu mẫu
+export const INITIAL_GOODS_RECEIPTS: GoodsReceiptNote[] = [];
+
+// Helper to seed initial master data if empty (Chỉ nạp danh mục chi phí và nhà cung cấp, KHÔNG nạp dữ liệu tồn kho hoặc xuất nhập giả định)
 export async function seedExtendedCustomersBatch() {
   return true;
 }
 
 export async function seedInitialDatabaseIfEmpty() {
   try {
-    const invRef = collection(db, 'inventory');
-    const invSnap = await getDocs(invRef);
-    
-    // If inventory already initialized, skip
-    if (!invSnap.empty) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('3tge_db_initialized', 'true');
-      }
-      return;
+    // Seed expense categories if empty
+    const expCatRef = collection(db, 'expenseCategories');
+    const expCatSnap = await getDocs(expCatRef);
+    if (expCatSnap.empty) {
+      await Promise.all(
+        INITIAL_EXPENSE_CATEGORIES.map(cat => setDoc(doc(db, 'expenseCategories', cat.id), cat, { merge: true }))
+      );
     }
 
-    // Seed basic inventory and initial transactions only if inventory is completely empty (no sample customers)
-    await Promise.all([
-      ...INITIAL_INVENTORY.map(item => setDoc(doc(db, 'inventory', item.id), item, { merge: true })),
-      ...INITIAL_CASH_TRANSACTIONS.map(cash => setDoc(doc(db, 'cashTransactions', cash.id), cash, { merge: true }))
-    ]);
+    // Seed suppliers if empty
+    const supRef = collection(db, 'suppliers');
+    const supSnap = await getDocs(supRef);
+    if (supSnap.empty) {
+      await Promise.all(
+        INITIAL_SUPPLIERS.map(sup => setDoc(doc(db, 'suppliers', sup.id), sup, { merge: true }))
+      );
+    }
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('3tge_db_initialized', 'true');
     }
   } catch (error) {
-    console.warn('Initial seeding note:', error);
+    console.warn('Initial master data seeding note:', error);
   }
 }
+
+// Xóa sạch toàn bộ dữ liệu tự phát sinh trong nghiệp vụ xuất nhập và tồn kho (phiếu nhập kho, giao dịch xuất nhập, tồn kho thử nghiệm)
+export async function purgeTestInventoryAndReceipts(): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+  try {
+    let deletedCount = 0;
+
+    // 1. Xóa toàn bộ phiếu nhập kho thử nghiệm
+    const receiptRef = collection(db, 'goodsReceipts');
+    const receiptSnap = await getDocs(receiptRef);
+    for (const d of receiptSnap.docs) {
+      await deleteDoc(doc(db, 'goodsReceipts', d.id));
+      deletedCount++;
+    }
+
+    // 2. Xóa toàn bộ giao dịch xuất nhập kho thử nghiệm
+    const transRef = collection(db, 'inventoryTransactions');
+    const transSnap = await getDocs(transRef);
+    for (const d of transSnap.docs) {
+      await deleteDoc(doc(db, 'inventoryTransactions', d.id));
+      deletedCount++;
+    }
+
+    // 3. Xóa toàn bộ danh mục vật tư tồn kho thử nghiệm
+    const invRef = collection(db, 'inventory');
+    const invSnap = await getDocs(invRef);
+    for (const d of invSnap.docs) {
+      await deleteDoc(doc(db, 'inventory', d.id));
+      deletedCount++;
+    }
+
+    // 4. Xóa phiếu chi tiền mặt thử nghiệm gắn liền với nhập kho thiết bị mẫu (cash_002)
+    const cashRef = collection(db, 'cashTransactions');
+    const cashSnap = await getDocs(cashRef);
+    for (const d of cashSnap.docs) {
+      const data = d.data();
+      if (d.id === 'cash_002' || data.category === 'Chi nhập thiết bị' || data.notes?.includes('2 bộ biến tần Deye 12KW')) {
+        await deleteDoc(doc(db, 'cashTransactions', d.id));
+        deletedCount++;
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('3tge_inventory_test_purged', 'true');
+    }
+    return { success: true, deletedCount };
+  } catch (err: any) {
+    console.error('Error in purgeTestInventoryAndReceipts:', err);
+    return { success: false, error: err.message };
+  }
+}
+

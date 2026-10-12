@@ -11,20 +11,25 @@ import {
   X, 
   PhoneCall, 
   ChevronRight,
+  ChevronDown,
   Sliders,
-  UserCheck
+  UserCheck,
+  FolderTree,
+  WalletCards,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { PermissionAction } from '../types/permissions';
 import { UserManagementModal } from './UserManagementModal';
 import { PWAInstallButton } from './PWAInstallButton';
+import { CatalogSubTab } from './CatalogView';
 
-export type NavTab = 'dashboard' | 'customers' | 'maintenance' | 'inventory' | 'cashflow' | 'reports';
+export type NavTab = 'dashboard' | 'customers' | 'maintenance' | 'inventory' | 'cashflow' | 'catalog' | 'reports';
 
 interface NavbarProps {
   currentTab: NavTab;
-  onSelectTab: (tab: NavTab) => void;
+  onSelectTab: (tab: NavTab, subTab?: CatalogSubTab) => void;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
   isOnline: boolean;
@@ -39,6 +44,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { currentUser, users, logout, switchUserAccount, hasRole, hasPermission } = useAuth();
   const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
+  const [catalogDropdownOpen, setCatalogDropdownOpen] = useState(false);
+  const dropdownTimeoutRef = React.useRef<any>(null);
+
+  const handleMouseEnterCatalog = () => {
+    if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+    setCatalogDropdownOpen(true);
+  };
+
+  const handleMouseLeaveCatalog = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setCatalogDropdownOpen(false);
+    }, 200);
+  };
 
   const navItems: { 
     id: NavTab; 
@@ -51,6 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'maintenance', label: 'Lịch & Bảo trì', icon: <CalendarClock className="w-4 h-4" />, requiredPerm: 'maintenance_schedule_view' },
     { id: 'inventory', label: 'Xuất Nhập Tồn', icon: <Boxes className="w-4 h-4" />, requiredPerm: 'inventory_view' },
     { id: 'cashflow', label: 'Thu Chi & Quỹ', icon: <Wallet className="w-4 h-4" />, requiredPerm: 'cashflow_view' },
+    { id: 'catalog', label: 'Danh mục', icon: <FolderTree className="w-4 h-4" />, requiredPerm: 'catalog_view' },
     { id: 'reports', label: 'Báo cáo & Thống kê', icon: <BarChart3 className="w-4 h-4" />, requiredPerm: 'reports_view' },
   ];
 
@@ -102,6 +121,85 @@ export const Navbar: React.FC<NavbarProps> = ({
                   return null;
                 }
                 const isActive = currentTab === item.id;
+
+                if (item.id === 'catalog') {
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="relative"
+                      onMouseEnter={handleMouseEnterCatalog}
+                      onMouseLeave={handleMouseLeaveCatalog}
+                    >
+                      <button
+                        onClick={() => {
+                          onSelectTab('catalog');
+                          setCatalogDropdownOpen(false);
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          isActive
+                            ? 'bg-emerald-50 text-emerald-700 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-emerald-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
+                        <span>{item.label}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform text-slate-400 ${catalogDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown Menu for Catalog */}
+                      {catalogDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Menu Danh Mục Nghiệp Vụ
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('catalog', 'items');
+                              setCatalogDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <Boxes className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">1. Vật Tư Hàng Hóa</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Quản lý Inverter, Pin, PV, ĐVT & Đơn giá</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('catalog', 'expenses');
+                              setCatalogDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <WalletCards className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">2. Danh Mục Chi Phí</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Các khoản chi hạch toán sổ quỹ & tiền mặt</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('catalog', 'suppliers');
+                              setCatalogDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <Building2 className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">3. Nhà Cung Cấp</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Đối tác phân phối thiết bị, MST & SĐT</div>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <button
                     key={item.id}
@@ -208,6 +306,74 @@ export const Navbar: React.FC<NavbarProps> = ({
                     return null;
                   }
                   const isActive = currentTab === item.id;
+
+                  if (item.id === 'catalog') {
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          onClick={() => {
+                            onSelectTab('catalog');
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700 font-bold'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </button>
+
+                        {/* Indented Subcategories on Mobile */}
+                        <div className="pl-6 pr-2 py-1 space-y-1 border-l-2 border-emerald-200 ml-4">
+                          <button
+                            onClick={() => {
+                              onSelectTab('catalog', 'items');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Boxes className="w-3.5 h-3.5 text-emerald-600" />
+                              1. Vật Tư Hàng Hóa
+                            </span>
+                            <ChevronRight className="w-3 h-3 text-slate-300" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSelectTab('catalog', 'expenses');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded"
+                          >
+                            <span className="flex items-center gap-2">
+                              <WalletCards className="w-3.5 h-3.5 text-emerald-600" />
+                              2. Danh Mục Chi Phí
+                            </span>
+                            <ChevronRight className="w-3 h-3 text-slate-300" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSelectTab('catalog', 'suppliers');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                              3. Danh Mục Nhà Cung Cấp
+                            </span>
+                            <ChevronRight className="w-3 h-3 text-slate-300" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <button
                       key={item.id}
