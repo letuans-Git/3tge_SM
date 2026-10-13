@@ -14,6 +14,7 @@ import { db } from '../firebase/config';
 import { 
   seedInitialDatabaseIfEmpty, 
   seedExtendedCustomersBatch,
+  purgeAllSimulatedData,
   purgeTestInventoryAndReceipts,
   INITIAL_CUSTOMERS, 
   INITIAL_INVENTORY, 
@@ -191,7 +192,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initial boot and real-time database listeners
   useEffect(() => {
     seedInitialDatabaseIfEmpty();
-    purgeTestInventoryAndReceipts().catch((err) => console.warn('Purge test inventory note:', err));
+    purgeAllSimulatedData().catch((err) => console.warn('Purge simulated data note:', err));
 
     // Listen to customers in real time
     const unsubCust = onSnapshot(collection(db, 'customers'), (snapshot) => {
@@ -206,11 +207,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCustomers(list);
       setIsLoading(false);
       setIsOnline(true);
-
-      // Auto-complement dataset if database has fewer than 12 customers to allow smart pagination testing
-      if (list.length > 0 && list.length < 12) {
-        seedExtendedCustomersBatch().catch((err) => console.warn('Auto-seed pagination batch note:', err));
-      }
     }, (error) => {
       console.warn('Firestore live sync note:', error);
       setIsLoading(false);
@@ -1243,16 +1239,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const seedDemoCustomersBatch = async (): Promise<boolean> => {
-    try {
-      const ok = await seedExtendedCustomersBatch();
-      if (ok) {
-        logActivity('Nạp dữ liệu mẫu phân trang', 'Nạp thành công 36 hồ sơ khách hàng mẫu chuẩn hóa phân trang');
-      }
-      return ok;
-    } catch (err) {
-      console.error('seedDemoCustomersBatch error:', err);
-      return false;
-    }
+    return false;
   };
 
   return (
