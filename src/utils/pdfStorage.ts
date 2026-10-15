@@ -215,7 +215,7 @@ export const removePdfFileFromStorage = async (
   }
 };
 
-// Batch save multiple PDF files
+// Batch save multiple PDF files to both local cache and Cloud Firestore
 export const persistCustomerPdfFiles = async (
   customerId: string,
   pdfDocs?: CustomerPdfDocument[]
@@ -223,12 +223,14 @@ export const persistCustomerPdfFiles = async (
   if (!pdfDocs || pdfDocs.length === 0) return;
   for (const docItem of pdfDocs) {
     if (docItem.fileData) {
-      // Save locally first
+      // 1. Save locally for instant offline preview on current device
       await savePdfToIndexedDB(customerId, docItem);
-      // Save to Firestore in background
-      savePdfToFirestore(customerId, docItem).catch((e) =>
-        console.warn('Background save PDF to Firestore note:', e)
-      );
+      // 2. Await upload to Firestore chunked storage so ALL users across all devices have access immediately
+      try {
+        await savePdfToFirestore(customerId, docItem);
+      } catch (e) {
+        console.warn('Error uploading PDF to shared Firestore:', e);
+      }
     }
   }
 };

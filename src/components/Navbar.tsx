@@ -224,6 +224,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <PWAInstallButton compact />
               </div>
 
+              {/* Cloud Firestore Shared Data live indicator */}
+              <div 
+                className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100/90 border border-slate-200 text-[10.5px] font-semibold text-slate-700"
+                title="Hệ thống đang kết nối và đồng bộ dữ liệu dùng chung Real-time trên Cloud Firestore"
+              >
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span>Dữ liệu dùng chung Real-time</span>
+              </div>
+
               {/* User Management & Permissions button for Admins or users with permission */}
               {(currentUser?.role === 'admin' || hasPermission('users_view') || hasPermission('roles_configure')) && (
                 <button

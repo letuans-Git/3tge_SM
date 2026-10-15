@@ -130,11 +130,6 @@ export const LoginView: React.FC = () => {
               <h2 className="text-base font-bold text-slate-900">
                 {isFirstTimeSetup ? 'Thiết Lập Quản Trị Viên' : 'Đăng Nhập Hệ Thống'}
               </h2>
-              <p className="text-[11px] text-slate-500">
-                {isFirstTimeSetup 
-                  ? 'Khởi tạo tài khoản Quản trị đầu tiên trên Cloud' 
-                  : 'Xác thực tài khoản người dùng trên Cloud Firestore'}
-              </p>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
               <Database className="w-3 h-3 text-emerald-600" />
@@ -344,25 +339,10 @@ export const LoginView: React.FC = () => {
                 <span>{submitting ? 'Đang xác thực trên Cloud...' : 'Đăng Nhập'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              <div className="pt-2 text-center">
-                <p className="text-[11px] text-slate-500">
-                  Tài khoản và quyền hạn được phân bổ trực tiếp bởi <strong>Quản Trị Viên</strong> trên Cloud Firestore.
-                </p>
-              </div>
             </form>
           )}
 
-          {/* Database Info Bar */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Cơ sở dữ liệu tập trung Firestore
-            </span>
-            <span className="font-mono text-slate-400">
-              {users.length} tài khoản active
-            </span>
-          </div>
+
         </div>
 
         {/* Footer hotline */}

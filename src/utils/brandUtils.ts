@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 export type BrandCategory = 'inverter' | 'battery' | 'solar' | 'wind';
@@ -165,30 +165,26 @@ export function useEquipmentBrands() {
     window.addEventListener('brands-updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // Initial check from Firestore
-    async function loadRemoteBrands() {
-      try {
-        const ref = doc(db, 'app_settings', 'brands');
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const data = snap.data();
-          (['inverter', 'battery', 'solar', 'wind'] as BrandCategory[]).forEach(cat => {
-            if (Array.isArray(data[cat]) && data[cat].length > 0) {
-              const merged = new Set([...getSavedBrands(cat), ...data[cat]]);
-              const list = Array.from(merged).filter(b => b !== 'KHAC');
-              list.push('KHAC');
-              localStorage.setItem(STORAGE_KEYS[cat], JSON.stringify(list));
-            }
-          });
-          refreshAll();
-        }
-      } catch (err) {
-        // Silently continue with local brands
+    // Real-time listener for brands from shared Firestore app_settings
+    const unsubFirestore = onSnapshot(doc(db, 'app_settings', 'brands'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        (['inverter', 'battery', 'solar', 'wind'] as BrandCategory[]).forEach(cat => {
+          if (Array.isArray(data[cat]) && data[cat].length > 0) {
+            const merged = new Set([...getSavedBrands(cat), ...data[cat]]);
+            const list = Array.from(merged).filter(b => b !== 'KHAC');
+            list.push('KHAC');
+            localStorage.setItem(STORAGE_KEYS[cat], JSON.stringify(list));
+          }
+        });
+        refreshAll();
       }
-    }
-    loadRemoteBrands();
+    }, (err) => {
+      console.warn('Real-time brands sync note:', err);
+    });
 
     return () => {
+      unsubFirestore();
       window.removeEventListener('brands-updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };

@@ -1,10 +1,15 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   initializeFirestore,
+  getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  memoryLocalCache
+  memoryLocalCache,
+  Firestore
 } from 'firebase/firestore';
+
+// Shared Cloud Firestore database ID for all users
+const SHARED_DATABASE_ID = 'ai-studio-f2e1b78c-7adf-4b28-86ee-1e9983fb930d';
 
 // In case firebase-applet-config.json exists
 let firebaseConfig: Record<string, string> = {
@@ -28,19 +33,25 @@ try {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Configure high-performance persistent cache for instant loading on phones and desktops,
-// with multi-tab support and automatic background server synchronization.
-let firestoreCache;
+const dbId = (typeof window !== 'undefined' && (window as any).__FIREBASE_CONFIG__?.firestoreDatabaseId) || SHARED_DATABASE_ID;
+
+let firestoreInstance: Firestore;
 try {
-  firestoreCache = persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  });
+  let firestoreCache;
+  try {
+    firestoreCache = persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    });
+  } catch {
+    firestoreCache = memoryLocalCache();
+  }
+  firestoreInstance = initializeFirestore(app, {
+    localCache: firestoreCache
+  }, dbId);
 } catch {
-  firestoreCache = memoryLocalCache();
+  firestoreInstance = getFirestore(app, dbId);
 }
 
-export const db = initializeFirestore(app, {
-  localCache: firestoreCache
-}, 'ai-studio-f2e1b78c-7adf-4b28-86ee-1e9983fb930d');
+export const db = firestoreInstance;
 
 export default app;

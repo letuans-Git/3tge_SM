@@ -45,6 +45,7 @@ import {
 import { useEquipmentBrands } from '../utils/brandUtils';
 import { BrandSelectField } from './BrandSelectField';
 import { PdfViewerModal } from './PdfViewerModal';
+import { resolvePdfFileData } from '../utils/pdfStorage';
 import { useDistributors } from '../utils/distributorUtils';
 import { DistributorSelectField } from './DistributorSelectField';
 
@@ -487,11 +488,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setPdfDocuments(prev => prev.filter(d => d.id !== id));
   };
 
-  const handleDownloadPdf = (doc: CustomerPdfDocument) => {
+  const handleDownloadPdf = async (doc: CustomerPdfDocument) => {
     try {
+      let fileData = doc.fileData;
+      if (!fileData || fileData.length < 50) {
+        fileData = await resolvePdfFileData(initialData?.id || '', doc);
+      }
+      if (!fileData) {
+        setErrorMsg('Không tìm thấy tệp PDF trong kho lưu trữ để tải về!');
+        return;
+      }
       const link = document.createElement('a');
-      link.href = doc.fileData;
-      link.download = doc.name;
+      link.href = fileData;
+      link.download = doc.name.endsWith('.pdf') ? doc.name : `${doc.name}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

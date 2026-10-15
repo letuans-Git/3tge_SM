@@ -197,7 +197,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initial boot and real-time database listeners
   useEffect(() => {
     seedInitialDatabaseIfEmpty();
-    purgeAllSimulatedData().catch((err) => console.warn('Purge simulated data note:', err));
 
     // Listen to customers in real time
     const unsubCust = onSnapshot(collection(db, 'customers'), (snapshot) => {
@@ -357,7 +356,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Persist full PDF files to IndexedDB & customer_pdf_files collection
     if (custData.pdfDocuments && custData.pdfDocuments.length > 0) {
-      persistCustomerPdfFiles(id, custData.pdfDocuments).catch(e => console.warn('PDF persist error:', e));
+      try {
+        await persistCustomerPdfFiles(id, custData.pdfDocuments);
+      } catch (e) {
+        console.warn('PDF persist error:', e);
+      }
     }
 
     const sanitizedPdfs = sanitizePdfDocsForCustomerDoc(custData.pdfDocuments);
@@ -401,9 +404,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalKW = invKW + windKW;
     }
 
+    const matched = customers.find(c => c.id === id || c.customerCode === id);
+    const targetDocId = matched?.id || id;
+
     // 1. If pdfDocuments are present, persist full files to IndexedDB & Firestore chunked storage
     if (updates.pdfDocuments && updates.pdfDocuments.length > 0) {
-      persistCustomerPdfFiles(id, updates.pdfDocuments).catch(e => console.warn('PDF persist error:', e));
+      try {
+        await persistCustomerPdfFiles(targetDocId, updates.pdfDocuments);
+      } catch (e) {
+        console.warn('PDF persist error:', e);
+      }
     }
 
     // 2. Optimistically update local state immediately so user sees changes and can view full PDFs instantly
@@ -421,8 +431,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 3. Persist to Firestore with sanitized PDF docs so customer doc never exceeds 1MB limit
     try {
-      const matched = customers.find(c => c.id === id || c.customerCode === id);
-      const targetDocId = matched?.id || id;
       const docRef = doc(db, 'customers', targetDocId);
       
       const firestoreUpdates = {

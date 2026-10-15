@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 export const DEFAULT_DISTRIBUTORS: string[] = [
@@ -110,29 +110,25 @@ export function useDistributors() {
     window.addEventListener('distributors-updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
-    // Initial check from Firestore
-    async function loadRemoteDistributors() {
-      try {
-        const ref = doc(db, 'app_settings', 'distributors');
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const data = snap.data();
-          if (Array.isArray(data.list) && data.list.length > 0) {
-            const current = getSavedDistributors();
-            const set = new Set([...current, ...data.list]);
-            const list = Array.from(set).filter(d => d.toLowerCase() !== 'khác');
-            list.push('Khác');
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-            refresh();
-          }
+    // Real-time listener for distributors from shared Firestore app_settings
+    const unsubFirestore = onSnapshot(doc(db, 'app_settings', 'distributors'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          const current = getSavedDistributors();
+          const set = new Set([...current, ...data.list]);
+          const list = Array.from(set).filter(d => d.toLowerCase() !== 'khác');
+          list.push('Khác');
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+          refresh();
         }
-      } catch (err) {
-        // Continue with local
       }
-    }
-    loadRemoteDistributors();
+    }, (err) => {
+      console.warn('Real-time distributors sync note:', err);
+    });
 
     return () => {
+      unsubFirestore();
       window.removeEventListener('distributors-updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
