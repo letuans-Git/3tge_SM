@@ -36,6 +36,11 @@ import {
 } from '../types';
 import { useAuth } from './AuthContext';
 import { formatDateVN, generateMaintenanceCode } from '../utils/dateUtils';
+import { 
+  persistCustomerPdfFiles, 
+  sanitizePdfDocsForCustomerDoc, 
+  removePdfFileFromStorage 
+} from '../utils/pdfStorage';
 
 export interface UsageCheckResult {
   isUsed: boolean;
@@ -350,15 +355,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const totalKW = inverterKW + windKW;
     const now = new Date().toISOString();
 
+    // 1. Persist full PDF files to IndexedDB & customer_pdf_files collection
+    if (custData.pdfDocuments && custData.pdfDocuments.length > 0) {
+      persistCustomerPdfFiles(id, custData.pdfDocuments).catch(e => console.warn('PDF persist error:', e));
+    }
+
+    const sanitizedPdfs = sanitizePdfDocsForCustomerDoc(custData.pdfDocuments);
+
     const newCustomer: Customer = {
       ...custData,
       id,
       customerCode: code,
       totalCapacityKW: totalKW,
+      pdfDocuments: sanitizedPdfs,
       createdAt: now,
       updatedAt: now
     };
 
+    // 2. Immediately update in-memory state with full pdfDocuments so user can view/download instantly
+    setCustomers(prev => [{
+      ...newCustomer,
+      pdfDocuments: custData.pdfDocuments || []
+    }, ...prev]);
+
+    // 3. Persist to Firestore with sanitized payload so document NEVER exceeds 1MB limit
     try {
       await setDoc(doc(db, 'customers', id), newCustomer);
     } catch (e) {
@@ -381,7 +401,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalKW = invKW + windKW;
     }
 
-    // 1. Optimistically update local state immediately so user sees changes instantly
+    // 1. If pdfDocuments are present, persist full files to IndexedDB & Firestore chunked storage
+    if (updates.pdfDocuments && updates.pdfDocuments.length > 0) {
+      persistCustomerPdfFiles(id, updates.pdfDocuments).catch(e => console.warn('PDF persist error:', e));
+    }
+
+    // 2. Optimistically update local state immediately so user sees changes and can view full PDFs instantly
     setCustomers(prev => prev.map(c => {
       if (c.id === id || c.customerCode === id) {
         return {
@@ -394,16 +419,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return c;
     }));
 
-    // 2. Persist to Firestore
+    // 3. Persist to Firestore with sanitized PDF docs so customer doc never exceeds 1MB limit
     try {
       const matched = customers.find(c => c.id === id || c.customerCode === id);
       const targetDocId = matched?.id || id;
       const docRef = doc(db, 'customers', targetDocId);
-      await updateDoc(docRef, {
+      
+      const firestoreUpdates = {
         ...updates,
+        ...(updates.pdfDocuments !== undefined ? {
+          pdfDocuments: sanitizePdfDocsForCustomerDoc(updates.pdfDocuments)
+        } : {}),
         ...(totalKW !== undefined ? { totalCapacityKW: totalKW } : {}),
         updatedAt: now
-      });
+      };
+
+      await updateDoc(docRef, firestoreUpdates);
     } catch (e) {
       console.warn('Updated in local state:', e);
     }

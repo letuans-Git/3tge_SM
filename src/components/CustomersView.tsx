@@ -39,14 +39,19 @@ import {
   Download,
   Smartphone,
   Laptop,
-  Share2
+  Share2,
+  FileText,
+  FileCheck,
+  Paperclip
 } from 'lucide-react';
-import { Customer, SystemStatus } from '../types';
+import { Customer, SystemStatus, CustomerPdfDocument } from '../types';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { CustomerFormModal } from './CustomerFormModal';
+import { PdfViewerModal } from './PdfViewerModal';
 import { exportCustomersToExcel } from '../utils/exportUtils';
 import { formatDateVN, formatDateTimeVN, dmyToISO } from '../utils/dateUtils';
+import { resolvePdfFileData } from '../utils/pdfStorage';
 
 export const getCustomerPhase = (customer: Customer): string => {
   const phases = customer.inverters?.map(i => i.phase).filter(Boolean) as string[];
@@ -148,6 +153,7 @@ export const CustomersView: React.FC = () => {
   };
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
+  const [previewPdfDoc, setPreviewPdfDoc] = useState<CustomerPdfDocument | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
@@ -155,6 +161,27 @@ export const CustomersView: React.FC = () => {
     setLightboxImage({ src, title });
     setZoomScale(1);
     setRotation(0);
+  };
+
+  const handleDownloadPdf = async (doc: CustomerPdfDocument) => {
+    try {
+      let fileData = doc.fileData;
+      if (!fileData || fileData.length < 50) {
+        fileData = await resolvePdfFileData(viewingCustomer?.id || '', doc);
+      }
+      if (!fileData) {
+        showToast('Không tìm thấy tệp PDF trong kho lưu trữ để tải về!', 'error');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = fileData;
+      link.download = doc.name.endsWith('.pdf') ? doc.name : `${doc.name}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download PDF error:', err);
+    }
   };
 
   // Disable Modal Confirmation
@@ -849,6 +876,18 @@ export const CustomersView: React.FC = () => {
                       <div className="flex items-center gap-1">
                         {c.isDisabled && <Ban className="w-3 h-3 text-rose-500 shrink-0" />}
                         <span>{c.customerCode}</span>
+                        {c.pdfDocuments && c.pdfDocuments.length > 0 && (
+                          <span 
+                            className="px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 font-bold text-[8px] border border-indigo-200 cursor-pointer hover:bg-indigo-100 transition" 
+                            title={`Đã lưu ${c.pdfDocuments.length} tệp PDF (Hóa đơn, CO, CQ)`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingCustomer(c);
+                            }}
+                          >
+                            📄 {c.pdfDocuments.length} PDF
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-[3px] px-1.5">
@@ -1012,6 +1051,14 @@ export const CustomersView: React.FC = () => {
                       <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                         {c.customerCode}
                       </span>
+                      {c.pdfDocuments && c.pdfDocuments.length > 0 && (
+                        <span 
+                          className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[9px] border border-indigo-200 cursor-pointer"
+                          onClick={() => setViewingCustomer(c)}
+                        >
+                          📄 {c.pdfDocuments.length} PDF
+                        </span>
+                      )}
                       {c.isDisabled && (
                         <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
                           Đã vô hiệu
@@ -1260,29 +1307,31 @@ export const CustomersView: React.FC = () => {
       </div>
 
       {/* Customer Form Modal */}
-      <CustomerFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingCustomer(null);
-        }}
-        initialData={editingCustomer}
-        nextCustomerCode={generateNextCustomerCode()}
-        onSubmit={async (data) => {
-          try {
-            if (editingCustomer) {
-              await updateCustomer(editingCustomer.id, data);
-              showToast(`Đã cập nhật thành công khách hàng ${editingCustomer.customerCode}!`, 'success');
-            } else {
-              const code = await addCustomer(data);
-              showToast(`Đã thêm mới thành công khách hàng ${code} - ${data.customerName}!`, 'success');
+      {isModalOpen && (
+        <CustomerFormModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingCustomer(null);
+          }}
+          initialData={editingCustomer}
+          nextCustomerCode={generateNextCustomerCode()}
+          onSubmit={async (data) => {
+            try {
+              if (editingCustomer) {
+                await updateCustomer(editingCustomer.id, data);
+                showToast(`Đã cập nhật thành công khách hàng ${editingCustomer.customerCode}!`, 'success');
+              } else {
+                const code = await addCustomer(data);
+                showToast(`Đã thêm mới thành công khách hàng ${code} - ${data.customerName}!`, 'success');
+              }
+            } catch (err: any) {
+              console.error('Error saving customer:', err);
+              showToast('Lỗi khi lưu thông tin khách hàng: ' + (err.message || ''), 'error');
             }
-          } catch (err: any) {
-            console.error('Error saving customer:', err);
-            showToast('Lỗi khi lưu thông tin khách hàng: ' + (err.message || ''), 'error');
-          }
-        }}
-      />
+          }}
+        />
+      )}
 
       {/* VIEW CUSTOMER DETAIL MODAL */}
       {viewingCustomer && (
@@ -1379,7 +1428,7 @@ export const CustomersView: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-black font-mono font-semibold">SN: {inv.serialNumber}</div>
+                          <div className="text-[22px] text-slate-900 font-mono font-extrabold tracking-tight leading-snug my-0.5">SN: {inv.serialNumber}</div>
                           <div className="text-[10px] text-black font-medium">NPP: {inv.distributor}</div>
                         </div>
                       ))
@@ -1405,7 +1454,7 @@ export const CustomersView: React.FC = () => {
                           <div className="font-extrabold text-black">
                             Tuabin {idx + 1}: {wind.brand} ({wind.capacityKW} KW)
                           </div>
-                          <div className="text-[11px] text-black font-mono font-semibold">SN: {wind.serialNumber || 'Chưa cập nhật'}</div>
+                          <div className="text-[22px] text-slate-900 font-mono font-extrabold tracking-tight leading-snug my-0.5">SN: {wind.serialNumber || 'Chưa cập nhật'}</div>
                           <div className="text-[10px] text-black font-medium">NPP: {wind.distributor || 'N/A'}</div>
                         </div>
                       ))}
@@ -1427,7 +1476,7 @@ export const CustomersView: React.FC = () => {
                     viewingCustomer.batteries.map((bat, idx) => (
                       <div key={bat.id || idx} className="p-2 bg-white rounded-md border border-slate-200 shadow-2xs">
                         <div className="font-extrabold text-black">Bộ {idx + 1}: {bat.brand} ({bat.capacityKWh} KWh)</div>
-                        <div className="text-[11px] text-black font-mono font-semibold">SN: {bat.serialNumber}</div>
+                        <div className="text-[22px] text-slate-900 font-mono font-extrabold tracking-tight leading-snug my-0.5">SN: {bat.serialNumber}</div>
                         <div className="text-[10px] text-black font-medium">NPP: {bat.distributor}</div>
                       </div>
                     ))
@@ -1436,11 +1485,11 @@ export const CustomersView: React.FC = () => {
               </div>
             </div>
 
-            {/* Photos */}
-            {viewingCustomer.images && Object.values(viewingCustomer.images).some(Boolean) && (
+            {/* Photos (Ảnh Hiện Trường Công Trình) */}
+            {viewingCustomer.images && (viewingCustomer.images.overview || viewingCustomer.images.panels || viewingCustomer.images.inverter || viewingCustomer.images.battery) && (
               <div className="space-y-1.5 pt-1.5 border-t border-slate-200">
                 <h4 className="font-extrabold text-xs text-black uppercase flex items-center justify-between">
-                  <span>Hình Ảnh Công Trình Thực Tế</span>
+                  <span>Hình Ảnh Hiện Trường Thực Tế</span>
                   <span className="text-[10px] text-black font-semibold">Nhấp ảnh để phóng to</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1453,24 +1502,6 @@ export const CustomersView: React.FC = () => {
                       <img src={viewingCustomer.images.overview} alt="Tổng thể" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
                     </div>
                   )}
-                  {viewingCustomer.images.inverter && (
-                    <div 
-                      onClick={() => handleOpenLightbox(viewingCustomer.images!.inverter!, 'Ảnh Hóa Đơn Nhập')}
-                      className="cursor-pointer group relative rounded-lg overflow-hidden border border-slate-200 hover:border-emerald-500 shadow-2xs transition"
-                    >
-                      <span className="text-[10px] bg-black/75 text-white font-bold px-1.5 py-0.5 rounded-br-lg absolute top-0 left-0 z-10">Hóa đơn nhập</span>
-                      <img src={viewingCustomer.images.inverter} alt="Ảnh Hóa Đơn Nhập" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
-                    </div>
-                  )}
-                  {viewingCustomer.images.battery && (
-                    <div 
-                      onClick={() => handleOpenLightbox(viewingCustomer.images!.battery!, 'Ảnh CO-CQ')}
-                      className="cursor-pointer group relative rounded-lg overflow-hidden border border-slate-200 hover:border-emerald-500 shadow-2xs transition"
-                    >
-                      <span className="text-[10px] bg-black/75 text-white font-bold px-1.5 py-0.5 rounded-br-lg absolute top-0 left-0 z-10">Ảnh CO-CQ</span>
-                      <img src={viewingCustomer.images.battery} alt="Ảnh CO-CQ" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
-                    </div>
-                  )}
                   {viewingCustomer.images.panels && (
                     <div 
                       onClick={() => handleOpenLightbox(viewingCustomer.images!.panels!, 'Ảnh Dàn Tấm Pin PV')}
@@ -1480,9 +1511,111 @@ export const CustomersView: React.FC = () => {
                       <img src={viewingCustomer.images.panels} alt="Tấm pin" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
                     </div>
                   )}
+                  {viewingCustomer.images.inverter && (
+                    <div 
+                      onClick={() => handleOpenLightbox(viewingCustomer.images!.inverter!, 'Ảnh Biến Tần Inverter')}
+                      className="cursor-pointer group relative rounded-lg overflow-hidden border border-slate-200 hover:border-emerald-500 shadow-2xs transition"
+                    >
+                      <span className="text-[10px] bg-black/75 text-white font-bold px-1.5 py-0.5 rounded-br-lg absolute top-0 left-0 z-10">Inverter</span>
+                      <img src={viewingCustomer.images.inverter} alt="Inverter" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
+                    </div>
+                  )}
+                  {viewingCustomer.images.battery && (
+                    <div 
+                      onClick={() => handleOpenLightbox(viewingCustomer.images!.battery!, 'Ảnh Pin Lưu Trữ')}
+                      className="cursor-pointer group relative rounded-lg overflow-hidden border border-slate-200 hover:border-emerald-500 shadow-2xs transition"
+                    >
+                      <span className="text-[10px] bg-black/75 text-white font-bold px-1.5 py-0.5 rounded-br-lg absolute top-0 left-0 z-10">Pin lưu trữ</span>
+                      <img src={viewingCustomer.images.battery} alt="Pin lưu trữ" className="w-full h-20 object-cover group-hover:scale-105 transition duration-200" />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
+            {/* Hồ Sơ & File PDF Khách Hàng (Hóa Đơn, CO, CQ...) */}
+            <div className="space-y-1.5 pt-1.5 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <h4 className="font-extrabold text-xs text-black uppercase flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Hồ Sơ & Tài Liệu File .PDF (Hóa Đơn, CO, CQ)</span>
+                </h4>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                  {viewingCustomer.pdfDocuments?.length || 0} tệp PDF đã lưu
+                </span>
+              </div>
+
+              {viewingCustomer.pdfDocuments && viewingCustomer.pdfDocuments.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {viewingCustomer.pdfDocuments.map((doc) => {
+                    const isInvoice = doc.category === 'invoice';
+                    const isCoCq = doc.category === 'co_cq' || doc.category === 'co' || doc.category === 'cq';
+                    return (
+                      <div 
+                        key={doc.id}
+                        className="p-2 bg-slate-50 border border-slate-200 hover:border-indigo-300 rounded-lg flex items-center justify-between gap-2 shadow-2xs transition group"
+                      >
+                        <div 
+                          className="min-w-0 flex-1 cursor-pointer"
+                          onClick={() => setPreviewPdfDoc(doc)}
+                          title="Bấm để xem tệp PDF này"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-rose-600 text-white uppercase">
+                              PDF
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold border ${
+                              isInvoice 
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                                : isCoCq 
+                                ? 'bg-teal-50 text-teal-700 border-teal-200' 
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                              {isInvoice ? 'Hóa Đơn' : isCoCq ? 'CO - CQ' : 'Tài Liệu'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-800 truncate mt-1 group-hover:text-indigo-600 transition">
+                            {doc.name}
+                          </div>
+                          <div className="text-[9.5px] text-slate-500 font-mono">
+                            {doc.fileSize || 'PDF'} • Tải lên: {doc.uploadedAt ? formatDateVN(doc.uploadedAt) : 'Mới'}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewPdfDoc(doc)}
+                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md font-bold text-xs flex items-center gap-1 transition"
+                            title="Xem trước tệp PDF"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline text-[10px]">Xem</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPdf(doc)}
+                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs flex items-center gap-1 transition"
+                            title="Tải tệp PDF về máy"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline text-[10px]">Tải</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-500">
+                  <FileText className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                  <p className="font-semibold text-slate-600">Chưa có file PDF nào được lưu cho khách hàng này.</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Bấm &quot;Chỉnh Sửa&quot; hồ sơ để chọn và lưu file PDF hóa đơn hoặc chứng chỉ CO, CQ.
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end pt-2 border-t border-slate-200">
               <button
@@ -1964,6 +2097,14 @@ export const CustomersView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Lightbox Modal for PDF Viewing in CustomersView (Using Canvas / PDF.js compatible with all browsers) */}
+      <PdfViewerModal
+        doc={previewPdfDoc}
+        customerId={viewingCustomer?.id}
+        onClose={() => setPreviewPdfDoc(null)}
+        onDownload={handleDownloadPdf}
+      />
     </div>
   );
 };

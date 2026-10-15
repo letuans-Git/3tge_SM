@@ -63,6 +63,15 @@ export interface CustomerImages {
   panels?: string;
 }
 
+export interface CustomerPdfDocument {
+  id: string;
+  name: string; // Tên file PDF (vd: Hoa_don_GTGT_001.pdf, CO_CQ_Inverter.pdf)
+  category: 'invoice' | 'co_cq' | 'co' | 'cq' | 'other' | string; // Loại tài liệu: Hóa đơn, CO-CQ, CO, CQ, Khác
+  fileData: string; // Base64 data URL: data:application/pdf;base64,...
+  fileSize?: string; // Kích thước tệp (vd: 350 KB, 1.2 MB)
+  uploadedAt: string; // Thời gian tải lên ISO string
+}
+
 export interface Customer {
   id: string; // Firestore document ID
   customerCode: string; // KH000001, KH000002...
@@ -81,6 +90,7 @@ export interface Customer {
   status: SystemStatus;
   notes?: string;
   images?: CustomerImages;
+  pdfDocuments?: CustomerPdfDocument[]; // Danh sách file .pdf liên quan (Hóa đơn, CO, CQ...)
   createdAt: string;
   updatedAt: string;
   totalCapacityKW: number; // Computed total capacity for fast analytics

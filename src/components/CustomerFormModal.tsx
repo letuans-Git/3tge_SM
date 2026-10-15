@@ -19,9 +19,19 @@ import {
   Image as ImageIcon,
   Wind,
   Eye,
-  Maximize2
+  Maximize2,
+  Download,
+  FileCheck,
+  FilePlus,
+  Paperclip,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  RotateCw
 } from 'lucide-react';
-import { Customer, InverterItem, BatteryItem, SolarBrand, InverterBrand, BatteryBrand, SystemStatus, WindTurbineItem } from '../types';
+import { Customer, InverterItem, BatteryItem, SolarBrand, InverterBrand, BatteryBrand, SystemStatus, WindTurbineItem, CustomerPdfDocument } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 import { 
   formatDateVN, 
@@ -34,6 +44,7 @@ import {
 } from '../utils/dateUtils';
 import { useEquipmentBrands } from '../utils/brandUtils';
 import { BrandSelectField } from './BrandSelectField';
+import { PdfViewerModal } from './PdfViewerModal';
 import { useDistributors } from '../utils/distributorUtils';
 import { DistributorSelectField } from './DistributorSelectField';
 
@@ -65,8 +76,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   initialData,
   nextCustomerCode
 }) => {
-  if (!isOpen) return null;
-
   const { 
     inverterBrands, 
     batteryBrands, 
@@ -161,10 +170,90 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     panels: initialData?.images?.panels || ''
   });
 
+  // PDF Documents (Hóa đơn, CO, CQ...)
+  const [pdfDocuments, setPdfDocuments] = useState<CustomerPdfDocument[]>(
+    initialData?.pdfDocuments || []
+  );
+  const [pdfUploading, setPdfUploading] = useState<boolean>(false);
+  const [previewPdf, setPreviewPdf] = useState<CustomerPdfDocument | null>(null);
+
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+  const [imageZoom, setImageZoom] = useState<number>(1);
+  const [imageRotation, setImageRotation] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Danh sách các ảnh đã lưu để xem theo album / gallery
+  const savedImageList = React.useMemo(() => {
+    return [
+      images.overview ? { key: 'overview' as const, title: 'Ảnh Tổng Thể Công Trình', src: images.overview } : null,
+      images.panels ? { key: 'panels' as const, title: 'Ảnh Dàn Tấm Pin PV', src: images.panels } : null,
+      images.inverter ? { key: 'inverter' as const, title: 'Ảnh Biến Tần Inverter', src: images.inverter } : null,
+      images.battery ? { key: 'battery' as const, title: 'Ảnh Pin Lưu Trữ', src: images.battery } : null,
+    ].filter(Boolean) as { key: 'overview' | 'panels' | 'inverter' | 'battery'; title: string; src: string }[];
+  }, [images]);
+
+  const openImageGallery = (index: number = 0) => {
+    if (savedImageList.length === 0) return;
+    const target = Math.max(0, Math.min(index, savedImageList.length - 1));
+    setActiveImageIndex(target);
+    setImageZoom(1);
+    setImageRotation(0);
+  };
+
+  const openImageGalleryByKey = (key: 'overview' | 'panels' | 'inverter' | 'battery') => {
+    const idx = savedImageList.findIndex(item => item.key === key);
+    if (idx !== -1) {
+      openImageGallery(idx);
+    } else if (images[key]) {
+      setPreviewImage({ src: images[key]!, title: getPhotoTitle(key) });
+    }
+  };
+
+  const getPhotoTitle = (key: string): string => {
+    switch (key) {
+      case 'overview': return 'Ảnh Tổng Thể Công Trình';
+      case 'panels': return 'Ảnh Dàn Tấm Pin PV';
+      case 'inverter': return 'Ảnh Biến Tần Inverter';
+      case 'battery': return 'Ảnh Pin Lưu Trữ';
+      default: return 'Hình Ảnh Hiện Trường';
+    }
+  };
+
+  const handleDownloadCurrentPhoto = (item: { title: string; src: string }) => {
+    try {
+      const link = document.createElement('a');
+      link.href = item.src;
+      link.download = `${initialData?.customerCode || 'Solar'}_${item.title.replace(/\s+/g, '_')}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download error:', err);
+    }
+  };
+
+  // Keyboard navigation for image lightbox
+  useEffect(() => {
+    if (activeImageIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveImageIndex(null);
+      } else if (e.key === 'ArrowLeft' && savedImageList.length > 1) {
+        setActiveImageIndex(prev => (prev !== null && prev > 0 ? prev - 1 : savedImageList.length - 1));
+        setImageZoom(1);
+        setImageRotation(0);
+      } else if (e.key === 'ArrowRight' && savedImageList.length > 1) {
+        setActiveImageIndex(prev => (prev !== null && prev < savedImageList.length - 1 ? prev + 1 : 0));
+        setImageZoom(1);
+        setImageRotation(0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeImageIndex, savedImageList.length]);
 
   // Sync form state when initialData or modal open status changes
   useEffect(() => {
@@ -213,8 +302,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         battery: initialData?.images?.battery || '',
         panels: initialData?.images?.panels || ''
       });
+      setPdfDocuments(initialData?.pdfDocuments || []);
       setErrorMsg('');
       setUploadingKey(null);
+      setPdfUploading(false);
     }
   }, [isOpen, initialData]);
 
@@ -309,6 +400,106 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  // PDF upload handler hỗ trợ chọn & nạp NHIỀU file .pdf cùng một lúc (Hóa đơn, CO, CQ...)
+  const handleMultiplePdfUpload = async (
+    files: FileList | File[] | null,
+    category: 'invoice' | 'co_cq' | 'other' = 'invoice'
+  ) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+
+    const validFiles: File[] = [];
+    for (const f of fileArray) {
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
+        setErrorMsg(`Tệp "${f.name}" không phải định dạng PDF. Chỉ hỗ trợ tệp .pdf!`);
+        continue;
+      }
+      if (f.size > 15 * 1024 * 1024) {
+        setErrorMsg(`Tệp PDF "${f.name}" vượt quá 15MB (${formatFileSize(f.size)}). Vui lòng chọn tệp nhỏ hơn!`);
+        continue;
+      }
+      validFiles.push(f);
+    }
+
+    if (validFiles.length === 0) return;
+
+    setPdfUploading(true);
+    setErrorMsg('');
+
+    try {
+      const readPromises = validFiles.map((file, idx) => {
+        return new Promise<CustomerPdfDocument>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const fileData = e.target?.result as string;
+            if (!fileData) {
+              reject(new Error(`Không thể đọc dữ liệu file "${file.name}"`));
+              return;
+            }
+
+            // Tự động phân loại nếu tải từ nút tổng hợp
+            let finalCat = category;
+            const lower = file.name.toLowerCase();
+            if (category === 'other') {
+              if (lower.includes('hd') || lower.includes('hoa_don') || lower.includes('invoice') || lower.includes('gtgt') || lower.includes('bill')) {
+                finalCat = 'invoice';
+              } else if (lower.includes('co') || lower.includes('cq') || lower.includes('chung_nhan') || lower.includes('cert')) {
+                finalCat = 'co_cq';
+              }
+            }
+
+            resolve({
+              id: `doc_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+              name: file.name,
+              category: finalCat,
+              fileData,
+              fileSize: formatFileSize(file.size),
+              uploadedAt: new Date().toISOString()
+            });
+          };
+
+          reader.onerror = () => {
+            reject(new Error(`Lỗi đọc tệp "${file.name}"`));
+          };
+
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const newDocs = await Promise.all(readPromises);
+      setPdfDocuments(prev => [...prev, ...newDocs]);
+    } catch (err: any) {
+      console.error('Error uploading multiple PDF files:', err);
+      setErrorMsg(err.message || 'Lỗi khi nạp danh sách file PDF!');
+    } finally {
+      setPdfUploading(false);
+    }
+  };
+
+  const handleRemovePdf = (id: string) => {
+    setPdfDocuments(prev => prev.filter(d => d.id !== id));
+  };
+
+  const handleDownloadPdf = (doc: CustomerPdfDocument) => {
+    try {
+      const link = document.createElement('a');
+      link.href = doc.fileData;
+      link.download = doc.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download PDF error:', err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim()) {
@@ -369,7 +560,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         warrantyExpiryDate: dmyToISO(warrantyExpiryDate),
         status,
         notes: notes.trim(),
-        images
+        images,
+        pdfDocuments
       });
 
       onClose();
@@ -380,12 +572,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-xl w-full max-w-5xl max-h-[96vh] overflow-y-auto shadow-2xl border border-slate-200">
         {/* Modal Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-3 py-1.5 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <h2 className="text-xs sm:text-sm font-bold text-slate-800">
               {initialData ? 'Chỉnh Sửa Hồ Sơ Khách Hàng' : 'Thêm Mới Khách Hàng & Hệ Thống Solar'}
             </h2>
@@ -395,6 +589,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">
               (Mã tự động)
             </span>
+
+            {/* Nút xem nhanh toàn bộ hình ảnh đã lưu */}
+            {savedImageList.length > 0 && (
+              <button
+                type="button"
+                onClick={() => openImageGallery(0)}
+                className="ml-1 sm:ml-2 px-2 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                title="Bấm để xem ngay tất cả hình ảnh đã lưu của khách hàng này"
+              >
+                <Camera className="w-3 h-3 text-emerald-600" />
+                <span>Xem {savedImageList.length} ảnh đã lưu</span>
+              </button>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -1087,91 +1294,568 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section 7: Image Uploads */}
-          <div className="space-y-1 pt-1 border-t border-slate-200">
+          {/* Section 7: Site Photos & Customer PDF Documents (Hóa Đơn, CO-CQ) */}
+          <div className="space-y-1.5 pt-1 border-t border-slate-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10.5px] font-extrabold uppercase tracking-wide text-black flex items-center gap-1">
-                <Upload className="w-3 h-3 text-emerald-600" />
-                7. Hình Ảnh Công Trình Thực Tế
+              <h3 className="text-[10.5px] font-extrabold uppercase tracking-wide text-black flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                <span>7. Hình Ảnh Hiện Trường & Hồ Sơ File PDF (Hóa Đơn, CO, CQ)</span>
               </h3>
-              <span className="text-[9px] text-slate-400 font-normal italic">
-                * Bấm vào ảnh để phóng to
+              <span className="text-[9px] text-slate-500 font-medium italic">
+                * Xem & lưu hình ảnh công trình và các file PDF chứng từ
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {[
-                { label: 'Ảnh Tổng Thể', key: 'overview' as const },
-                { label: 'Ảnh Hóa Đơn Nhập', key: 'inverter' as const },
-                { label: 'Ảnh CO-CQ', key: 'battery' as const },
-                { label: 'Ảnh Tấm Pin PV', key: 'panels' as const },
-              ].map(({ label, key }) => (
-                <div key={key} className="border border-slate-200 rounded p-1 text-center space-y-0.5 bg-slate-50/70 relative overflow-hidden">
+            {/* PHẦN 7.1: HÌNH ẢNH HIỆN TRƯỜNG & THIẾT BỊ ĐÃ LƯU */}
+            <div className="bg-slate-50/90 rounded-lg p-2 border border-slate-200 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1 border-b border-slate-200/80">
+                <div className="flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-800">
+                    Hình Ảnh Hiện Trường & Thiết Bị Đã Lưu
+                  </span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                    savedImageList.length > 0 
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {savedImageList.length > 0 ? `Đã lưu ${savedImageList.length}/4 hình ảnh` : 'Chưa có ảnh'}
+                  </span>
+                </div>
+
+                {/* Nút bấm xem toàn bộ ảnh đã lưu (Gallery View) */}
+                {savedImageList.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => openImageGallery(0)}
+                    className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[9.5px] font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                    title="Bấm để mở album xem toàn bộ hình ảnh đã lưu phóng to đầy đủ"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Xem Toàn Bộ Ảnh Đã Lưu ({savedImageList.length})</span>
+                  </button>
+                ) : (
+                  <span className="text-[9px] text-slate-400 italic">
+                    Có thể tải ảnh tổng thể, dàn pin, biến tần hoặc pin lưu trữ bên dưới
+                  </span>
+                )}
+              </div>
+
+              {/* 4 Khung Ảnh Hiện Trường (Tổng thể, Dàn Pin, Inverter, Pin Lưu Trữ) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {/* 1. Ảnh Tổng Thể */}
+                <div className="border border-slate-200 rounded-lg p-1.5 text-center space-y-1 bg-white relative overflow-hidden flex flex-col justify-between min-h-[105px] shadow-2xs">
                   <div className="flex items-center justify-between px-0.5">
-                    <span className="text-[9px] font-bold text-black truncate">{label}</span>
-                    {images[key] && (
+                    <span className="text-[9px] font-bold text-slate-800 truncate flex items-center gap-1">
+                      <ImageIcon className="w-2.5 h-2.5 text-emerald-600" />
+                      <span>Ảnh Tổng Thể</span>
+                    </span>
+                    {images.overview && (
                       <button
                         type="button"
-                        onClick={() => setPreviewImage({ src: images[key], title: label })}
-                        title="Phóng to xem đầy đủ ảnh"
-                        className="text-[8.5px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5"
+                        onClick={() => openImageGalleryByKey('overview')}
+                        title="Bấm để xem ảnh đầy đủ"
+                        className="text-[8.5px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 cursor-pointer"
                       >
                         <Eye className="w-2.5 h-2.5" /> Xem
                       </button>
                     )}
                   </div>
-                  
-                  {uploadingKey === key ? (
-                    <div className="h-16 sm:h-20 flex flex-col items-center justify-center text-[9px] text-emerald-700 bg-emerald-50 rounded border border-slate-200">
+
+                  {uploadingKey === 'overview' ? (
+                    <div className="h-18 flex flex-col items-center justify-center text-[9px] text-emerald-700 bg-emerald-50 rounded border border-slate-200">
                       <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-emerald-600" />
                       <span>Đang nén ảnh...</span>
                     </div>
-                  ) : images[key] ? (
-                    <div className="relative group rounded overflow-hidden border border-slate-300 bg-slate-900/5 h-16 sm:h-20 flex items-center justify-center">
+                  ) : images.overview ? (
+                    <div className="relative group rounded-md overflow-hidden border border-slate-200 bg-slate-900/5 h-18 flex items-center justify-center">
                       <img 
-                        src={images[key]} 
-                        alt={label} 
-                        onClick={() => setPreviewImage({ src: images[key], title: label })}
-                        className="w-full h-full object-contain cursor-pointer transition hover:scale-102"
+                        src={images.overview} 
+                        alt="Ảnh Tổng Thể" 
+                        onClick={() => openImageGalleryByKey('overview')}
+                        className="w-full h-full object-cover cursor-pointer transition group-hover:scale-105"
                         title="Bấm để xem ảnh đầy đủ"
                       />
                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 pointer-events-none group-hover:pointer-events-auto">
                         <button
                           type="button"
-                          onClick={() => setPreviewImage({ src: images[key], title: label })}
+                          onClick={() => openImageGalleryByKey('overview')}
                           title="Xem toàn bộ ảnh đầy đủ"
-                          className="p-1 bg-emerald-600 text-white rounded-full text-xs shadow hover:bg-emerald-700 transition"
+                          className="p-1 bg-emerald-600 text-white rounded-full text-xs shadow hover:bg-emerald-700 transition cursor-pointer"
                         >
                           <Maximize2 className="w-3 h-3" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => setImages({ ...images, [key]: '' })}
+                          onClick={() => setImages(prev => ({ ...prev, overview: '' }))}
                           title="Xóa ảnh này"
-                          className="p-1 bg-rose-600 text-white rounded-full text-xs shadow hover:bg-rose-700 transition"
+                          className="p-1 bg-rose-600 text-white rounded-full text-xs shadow hover:bg-rose-700 transition cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="cursor-pointer flex flex-col items-center justify-center h-16 sm:h-20 rounded border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition p-1">
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-18 rounded-md border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition p-1">
                       <Upload className="w-4 h-4 text-slate-400" />
-                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5">Tải ảnh</span>
+                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5">+ Tải ảnh tổng thể</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           if (e.target.files?.[0]) {
-                            handleImageUpload(key, e.target.files[0]);
+                            handleImageUpload('overview', e.target.files[0]);
                           }
                         }}
                       />
                     </label>
                   )}
                 </div>
-              ))}
+
+                {/* 2. Ảnh Dàn Tấm Pin PV */}
+                <div className="border border-slate-200 rounded-lg p-1.5 text-center space-y-1 bg-white relative overflow-hidden flex flex-col justify-between min-h-[105px] shadow-2xs">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[9px] font-bold text-slate-800 truncate flex items-center gap-1">
+                      <Sun className="w-2.5 h-2.5 text-amber-500" />
+                      <span>Ảnh Dàn Pin PV</span>
+                    </span>
+                    {images.panels && (
+                      <button
+                        type="button"
+                        onClick={() => openImageGalleryByKey('panels')}
+                        title="Bấm để xem ảnh đầy đủ"
+                        className="text-[8.5px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Eye className="w-2.5 h-2.5" /> Xem
+                      </button>
+                    )}
+                  </div>
+
+                  {uploadingKey === 'panels' ? (
+                    <div className="h-18 flex flex-col items-center justify-center text-[9px] text-emerald-700 bg-emerald-50 rounded border border-slate-200">
+                      <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-emerald-600" />
+                      <span>Đang nén ảnh...</span>
+                    </div>
+                  ) : images.panels ? (
+                    <div className="relative group rounded-md overflow-hidden border border-slate-200 bg-slate-900/5 h-18 flex items-center justify-center">
+                      <img 
+                        src={images.panels} 
+                        alt="Ảnh Dàn Pin PV" 
+                        onClick={() => openImageGalleryByKey('panels')}
+                        className="w-full h-full object-cover cursor-pointer transition group-hover:scale-105"
+                        title="Bấm để xem ảnh đầy đủ"
+                      />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={() => openImageGalleryByKey('panels')}
+                          title="Xem toàn bộ ảnh đầy đủ"
+                          className="p-1 bg-emerald-600 text-white rounded-full text-xs shadow hover:bg-emerald-700 transition cursor-pointer"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImages(prev => ({ ...prev, panels: '' }))}
+                          title="Xóa ảnh này"
+                          className="p-1 bg-rose-600 text-white rounded-full text-xs shadow hover:bg-rose-700 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-18 rounded-md border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition p-1">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5">+ Tải ảnh dàn pin</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleImageUpload('panels', e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* 3. Ảnh Biến Tần Inverter */}
+                <div className="border border-slate-200 rounded-lg p-1.5 text-center space-y-1 bg-white relative overflow-hidden flex flex-col justify-between min-h-[105px] shadow-2xs">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[9px] font-bold text-slate-800 truncate flex items-center gap-1">
+                      <Cpu className="w-2.5 h-2.5 text-emerald-600" />
+                      <span>Ảnh Inverter</span>
+                    </span>
+                    {images.inverter && (
+                      <button
+                        type="button"
+                        onClick={() => openImageGalleryByKey('inverter')}
+                        title="Bấm để xem ảnh đầy đủ"
+                        className="text-[8.5px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Eye className="w-2.5 h-2.5" /> Xem
+                      </button>
+                    )}
+                  </div>
+
+                  {uploadingKey === 'inverter' ? (
+                    <div className="h-18 flex flex-col items-center justify-center text-[9px] text-emerald-700 bg-emerald-50 rounded border border-slate-200">
+                      <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-emerald-600" />
+                      <span>Đang nén ảnh...</span>
+                    </div>
+                  ) : images.inverter ? (
+                    <div className="relative group rounded-md overflow-hidden border border-slate-200 bg-slate-900/5 h-18 flex items-center justify-center">
+                      <img 
+                        src={images.inverter} 
+                        alt="Ảnh Biến Tần Inverter" 
+                        onClick={() => openImageGalleryByKey('inverter')}
+                        className="w-full h-full object-cover cursor-pointer transition group-hover:scale-105"
+                        title="Bấm để xem ảnh đầy đủ"
+                      />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={() => openImageGalleryByKey('inverter')}
+                          title="Xem toàn bộ ảnh đầy đủ"
+                          className="p-1 bg-emerald-600 text-white rounded-full text-xs shadow hover:bg-emerald-700 transition cursor-pointer"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImages(prev => ({ ...prev, inverter: '' }))}
+                          title="Xóa ảnh này"
+                          className="p-1 bg-rose-600 text-white rounded-full text-xs shadow hover:bg-rose-700 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-18 rounded-md border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition p-1">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5">+ Tải ảnh Inverter</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleImageUpload('inverter', e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* 4. Ảnh Pin Lưu Trữ */}
+                <div className="border border-slate-200 rounded-lg p-1.5 text-center space-y-1 bg-white relative overflow-hidden flex flex-col justify-between min-h-[105px] shadow-2xs">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[9px] font-bold text-slate-800 truncate flex items-center gap-1">
+                      <Battery className="w-2.5 h-2.5 text-blue-600" />
+                      <span>Ảnh Pin Lưu Trữ</span>
+                    </span>
+                    {images.battery && (
+                      <button
+                        type="button"
+                        onClick={() => openImageGalleryByKey('battery')}
+                        title="Bấm để xem ảnh đầy đủ"
+                        className="text-[8.5px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Eye className="w-2.5 h-2.5" /> Xem
+                      </button>
+                    )}
+                  </div>
+
+                  {uploadingKey === 'battery' ? (
+                    <div className="h-18 flex flex-col items-center justify-center text-[9px] text-emerald-700 bg-emerald-50 rounded border border-slate-200">
+                      <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-emerald-600" />
+                      <span>Đang nén ảnh...</span>
+                    </div>
+                  ) : images.battery ? (
+                    <div className="relative group rounded-md overflow-hidden border border-slate-200 bg-slate-900/5 h-18 flex items-center justify-center">
+                      <img 
+                        src={images.battery} 
+                        alt="Ảnh Pin Lưu Trữ" 
+                        onClick={() => openImageGalleryByKey('battery')}
+                        className="w-full h-full object-cover cursor-pointer transition group-hover:scale-105"
+                        title="Bấm để xem ảnh đầy đủ"
+                      />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={() => openImageGalleryByKey('battery')}
+                          title="Xem toàn bộ ảnh đầy đủ"
+                          className="p-1 bg-emerald-600 text-white rounded-full text-xs shadow hover:bg-emerald-700 transition cursor-pointer"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImages(prev => ({ ...prev, battery: '' }))}
+                          title="Xóa ảnh này"
+                          className="p-1 bg-rose-600 text-white rounded-full text-xs shadow hover:bg-rose-700 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-18 rounded-md border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition p-1">
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span className="text-[9px] text-emerald-700 font-bold mt-0.5">+ Tải ảnh pin lưu trữ</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            handleImageUpload('battery', e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PHẦN 7.2: HỒ SƠ & FILE TÀI LIỆU .PDF (HÓA ĐƠN, CHỨNG CHỈ CO, CQ) */}
+            <div className="bg-indigo-50/30 rounded-lg p-2 border border-indigo-200/80 space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-indigo-200/60">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-indigo-950">
+                    Hồ Sơ Tài Liệu File .PDF Liên Quan Đến Khách Hàng
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 font-mono">
+                  {pdfDocuments.length} tệp .PDF
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {/* Cột 1: File PDF Hóa Đơn (Hóa đơn GTGT, Phiếu xuất kho...) - Chọn & lưu nhiều file */}
+                <div className="border border-indigo-200 bg-white rounded-lg p-2 flex flex-col justify-between min-h-[120px] shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9.5px] font-extrabold text-indigo-950 flex items-center gap-1" title="Lưu nhiều file .PDF hóa đơn liên quan">
+                      <FileText className="w-3 h-3 text-indigo-600 shrink-0" />
+                      <span>File PDF Hóa Đơn (GTGT, Xuất kho...)</span>
+                    </span>
+                    <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
+                      {pdfDocuments.filter(d => d.category === 'invoice').length} file
+                    </span>
+                  </div>
+
+                  {pdfUploading ? (
+                    <div className="h-20 flex flex-col items-center justify-center text-[9px] text-indigo-700 bg-indigo-50/50 rounded border border-indigo-200">
+                      <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-indigo-600" />
+                      <span>Đang nạp file PDF...</span>
+                    </div>
+                  ) : pdfDocuments.filter(d => d.category === 'invoice').length > 0 ? (
+                    <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
+                      {pdfDocuments.filter(d => d.category === 'invoice').map((doc) => (
+                        <div key={doc.id} className="p-1.5 bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 rounded text-left flex items-center justify-between gap-1 shadow-2xs transition">
+                          <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setPreviewPdf(doc)} title="Bấm để xem trước file PDF này">
+                            <div className="text-[9px] font-bold text-indigo-950 truncate leading-tight flex items-center gap-1">
+                              <span className="text-[7.5px] px-1 py-0.1 bg-rose-600 text-white font-bold rounded">PDF</span>
+                              <span className="truncate">{doc.name}</span>
+                            </div>
+                            <div className="text-[8px] text-slate-500 font-mono mt-0.5">{doc.fileSize || 'PDF'}</div>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPdf(doc)}
+                              title="Xem trực tiếp file PDF này"
+                              className="p-1 rounded text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdf(doc)}
+                              title="Tải tệp về máy"
+                              className="p-1 rounded text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePdf(doc.id)}
+                              title="Xóa tệp PDF này"
+                              className="p-1 rounded text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <label className="cursor-pointer block text-center py-1 text-[8.5px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50/60 hover:bg-indigo-100/80 rounded border border-dashed border-indigo-300 transition">
+                        + Chọn Thêm File Hóa Đơn (Chọn được nhiều file)
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleMultiplePdfUpload(e.target.files, 'invoice');
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-20 rounded border border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50/50 transition p-1 group">
+                      <FileText className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition" />
+                      <span className="text-[9.5px] text-indigo-800 font-bold mt-0.5">Chọn nhiều file .PDF Hóa Đơn</span>
+                      <span className="text-[7.5px] text-slate-500 font-medium">Hóa đơn GTGT, Phiếu giao hàng, Biên bản...</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleMultiplePdfUpload(e.target.files, 'invoice');
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Cột 2: File PDF CO, CQ (Chứng nhận xuất xứ & Chất lượng) - Chọn & lưu nhiều file */}
+                <div className="border border-teal-200 bg-white rounded-lg p-2 flex flex-col justify-between min-h-[120px] shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9.5px] font-extrabold text-teal-950 flex items-center gap-1" title="Lưu nhiều file .PDF chứng chỉ CO, CQ">
+                      <FileCheck className="w-3 h-3 text-teal-600 shrink-0" />
+                      <span>File PDF Chứng Chỉ CO, CQ (Xuất xứ & Chất lượng)</span>
+                    </span>
+                    <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 font-mono">
+                      {pdfDocuments.filter(d => d.category === 'co_cq' || d.category === 'co' || d.category === 'cq').length} file
+                    </span>
+                  </div>
+
+                  {pdfUploading ? (
+                    <div className="h-20 flex flex-col items-center justify-center text-[9px] text-teal-700 bg-teal-50/50 rounded border border-teal-200">
+                      <Loader2 className="w-4 h-4 animate-spin mb-0.5 text-teal-600" />
+                      <span>Đang nạp file PDF...</span>
+                    </div>
+                  ) : pdfDocuments.filter(d => d.category === 'co_cq' || d.category === 'co' || d.category === 'cq').length > 0 ? (
+                    <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
+                      {pdfDocuments.filter(d => d.category === 'co_cq' || d.category === 'co' || d.category === 'cq').map((doc) => (
+                        <div key={doc.id} className="p-1.5 bg-slate-50 hover:bg-teal-50/60 border border-slate-200 hover:border-teal-300 rounded text-left flex items-center justify-between gap-1 shadow-2xs transition">
+                          <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setPreviewPdf(doc)} title="Bấm để xem trước file PDF này">
+                            <div className="text-[9px] font-bold text-teal-950 truncate leading-tight flex items-center gap-1">
+                              <span className="text-[7.5px] px-1 py-0.1 bg-teal-600 text-white font-bold rounded">CO-CQ</span>
+                              <span className="truncate">{doc.name}</span>
+                            </div>
+                            <div className="text-[8px] text-slate-500 font-mono mt-0.5">{doc.fileSize || 'PDF'}</div>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPdf(doc)}
+                              title="Xem trực tiếp file PDF này"
+                              className="p-1 rounded text-teal-700 hover:bg-teal-100 transition cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdf(doc)}
+                              title="Tải tệp về máy"
+                              className="p-1 rounded text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePdf(doc.id)}
+                              title="Xóa tệp PDF này"
+                              className="p-1 rounded text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <label className="cursor-pointer block text-center py-1 text-[8.5px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50/60 hover:bg-teal-100/80 rounded border border-dashed border-teal-300 transition">
+                        + Chọn Thêm File CO/CQ (Chọn được nhiều file)
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleMultiplePdfUpload(e.target.files, 'co_cq');
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center justify-center flex-1 h-20 rounded border border-dashed border-teal-300 hover:border-teal-500 hover:bg-teal-50/50 transition p-1 group">
+                      <FileCheck className="w-4 h-4 text-teal-600 group-hover:scale-110 transition" />
+                      <span className="text-[9.5px] text-teal-800 font-bold mt-0.5">Chọn nhiều file .PDF CO, CQ</span>
+                      <span className="text-[7.5px] text-slate-500 font-medium">Chứng nhận xuất xứ thiết bị & chất lượng</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleMultiplePdfUpload(e.target.files, 'co_cq');
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Thanh đính kèm thêm file .PDF khác & tóm tắt tổng số file */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 text-[9.5px] bg-white px-2.5 py-1.5 rounded-md border border-indigo-200">
+                <div className="flex items-center gap-1.5 text-slate-700">
+                  <Paperclip className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>
+                    Tổng cộng: <strong className="text-indigo-900 font-bold">{pdfDocuments.length}</strong> file PDF (
+                    Hóa đơn: <strong className="text-indigo-700 font-bold">{pdfDocuments.filter(d => d.category === 'invoice').length}</strong> | 
+                    CO/CQ: <strong className="text-teal-700 font-bold">{pdfDocuments.filter(d => d.category === 'co_cq' || d.category === 'co' || d.category === 'cq').length}</strong>
+                    {pdfDocuments.filter(d => d.category === 'other').length > 0 && ` | Khác: ${pdfDocuments.filter(d => d.category === 'other').length}`}
+                    )
+                  </span>
+                </div>
+                <label className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-50 hover:bg-indigo-50 text-indigo-900 font-bold border border-indigo-200 shadow-2xs transition">
+                  <FilePlus className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>+ Đính Kèm Thêm Nhiều File .PDF</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        handleMultiplePdfUpload(e.target.files, 'other');
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
 
@@ -1196,39 +1880,223 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         </form>
       </div>
 
-      {/* Lightbox Modal for Full Image View */}
-      {previewImage && (
-        <div
-          className="fixed inset-0 z-70 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 animate-in fade-in duration-150"
-          onClick={() => setPreviewImage(null)}
-        >
+      {/* Interactive Lightbox Modal for Full Image & Gallery View */}
+      {(activeImageIndex !== null || previewImage !== null) && (() => {
+        const currentItem = activeImageIndex !== null && savedImageList[activeImageIndex]
+          ? savedImageList[activeImageIndex]
+          : previewImage
+            ? { title: previewImage.title, src: previewImage.src, key: 'preview' }
+            : null;
+
+        if (!currentItem) return null;
+
+        const totalImages = savedImageList.length;
+        const currentDisplayIndex = activeImageIndex !== null ? activeImageIndex + 1 : 1;
+
+        return (
           <div
-            className="relative max-w-4xl max-h-[92vh] w-full bg-slate-900 rounded-xl overflow-hidden shadow-2xl flex flex-col border border-slate-700"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-70 bg-black/90 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150"
+            onClick={() => {
+              setActiveImageIndex(null);
+              setPreviewImage(null);
+            }}
           >
-            <div className="flex items-center justify-between px-4 py-2 text-white border-b border-slate-800 bg-slate-950">
-              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-emerald-400" />
-                {previewImage.title} (Toàn Bộ Ảnh Đầy Đủ)
-              </span>
-              <button
-                type="button"
-                onClick={() => setPreviewImage(null)}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            <div
+              className="relative max-w-5xl max-h-[94vh] w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-slate-700 text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header with Title, Index, Zoom, Rotate, Download, Close */}
+              <div className="flex flex-wrap items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-950/95 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1 rounded bg-emerald-500/20 text-emerald-400">
+                    <Camera className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-100 truncate flex items-center gap-1.5">
+                      <span>{currentItem.title}</span>
+                      {totalImages > 0 && (
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-800 text-emerald-400 border border-slate-700">
+                          {currentDisplayIndex} / {totalImages}
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Toolbar controls */}
+                <div className="flex items-center gap-1 sm:gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setImageZoom(prev => Math.min(3.5, Number((prev + 0.2).toFixed(1))))}
+                    title="Phóng to ảnh"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setImageZoom(prev => Math.max(0.5, Number((prev - 0.2).toFixed(1))))}
+                    title="Thu nhỏ ảnh"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+
+                  {imageZoom !== 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setImageZoom(1)}
+                      title="Trở về 100%"
+                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-[10px] transition cursor-pointer"
+                    >
+                      100%
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setImageRotation(prev => (prev + 90) % 360)}
+                    title="Xoay ảnh 90°"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadCurrentPhoto(currentItem)}
+                    title="Tải ảnh về máy"
+                    className="p-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white transition cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-5 bg-slate-700 mx-0.5" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveImageIndex(null);
+                      setPreviewImage(null);
+                    }}
+                    title="Đóng (Esc)"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-300 transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main View Area with Next/Prev and Zoomed Canvas */}
+              <div 
+                className="relative flex-1 p-2 flex items-center justify-center bg-black/80 overflow-hidden min-h-[55vh] max-h-[72vh]"
+                onWheel={(e) => {
+                  if (e.deltaY < 0) {
+                    setImageZoom(prev => Math.min(3.5, Number((prev + 0.15).toFixed(2))));
+                  } else {
+                    setImageZoom(prev => Math.max(0.5, Number((prev - 0.15).toFixed(2))));
+                  }
+                }}
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-2 flex items-center justify-center overflow-auto max-h-[calc(92vh-50px)] bg-slate-950/70">
-              <img
-                src={previewImage.src}
-                alt={previewImage.title}
-                className="max-w-full max-h-[80vh] object-contain rounded shadow-lg"
-              />
+                {/* Previous Button */}
+                {totalImages > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIndex(prev => (prev !== null && prev > 0 ? prev - 1 : totalImages - 1));
+                      setImageZoom(1);
+                      setImageRotation(0);
+                    }}
+                    className="absolute left-3 z-20 p-2 sm:p-2.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white shadow-xl transition cursor-pointer border border-slate-700 hover:scale-110"
+                    title="Ảnh trước (Mũi tên trái ←)"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                )}
+
+                {/* The Image */}
+                <div 
+                  className="transition-transform duration-150 ease-out flex items-center justify-center max-w-full max-h-full"
+                  style={{
+                    transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`
+                  }}
+                >
+                  <img
+                    src={currentItem.src}
+                    alt={currentItem.title}
+                    className="max-w-full max-h-[68vh] object-contain rounded-lg shadow-2xl pointer-events-none"
+                  />
+                </div>
+
+                {/* Next Button */}
+                {totalImages > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIndex(prev => (prev !== null && prev < totalImages - 1 ? prev + 1 : 0));
+                      setImageZoom(1);
+                      setImageRotation(0);
+                    }}
+                    className="absolute right-3 z-20 p-2 sm:p-2.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white shadow-xl transition cursor-pointer border border-slate-700 hover:scale-110"
+                    title="Ảnh tiếp theo (Mũi tên phải →)"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Bottom Thumbnails Strip for Quick Switching */}
+              {totalImages > 0 && (
+                <div className="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 overflow-x-auto py-0.5">
+                    {savedImageList.map((img, idx) => {
+                      const isCurrent = activeImageIndex === idx;
+                      return (
+                        <button
+                          key={img.key}
+                          type="button"
+                          onClick={() => {
+                            setActiveImageIndex(idx);
+                            setImageZoom(1);
+                            setImageRotation(0);
+                          }}
+                          className={`relative rounded-md overflow-hidden border-2 transition shrink-0 cursor-pointer ${
+                            isCurrent 
+                              ? 'border-emerald-500 ring-2 ring-emerald-500/40 scale-105' 
+                              : 'border-slate-700 opacity-60 hover:opacity-100'
+                          }`}
+                          style={{ width: '48px', height: '36px' }}
+                          title={`Xem ${img.title}`}
+                        >
+                          <img src={img.src} alt={img.title} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[7px] text-white font-bold text-center truncate px-0.5">
+                            {idx + 1}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 hidden sm:block shrink-0 italic">
+                    Mẹo: Dùng phím ← → để chuyển ảnh, cuộn chuột để phóng to, Esc để đóng
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Lightbox Modal for PDF Preview (Using Canvas / PDF.js compatible with all browsers) */}
+      <PdfViewerModal
+        doc={previewPdf}
+        customerId={initialData?.id}
+        onClose={() => setPreviewPdf(null)}
+        onDownload={handleDownloadPdf}
+      />
     </div>
   );
 };
