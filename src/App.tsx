@@ -28,6 +28,18 @@ function MainApp() {
     setCurrentTab(tab);
   };
 
+  // Lắng nghe sự kiện chuyển tab từ các modul (ví dụ mở nhanh Danh mục Nhà cung cấp)
+  React.useEffect(() => {
+    const handleNavEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tab: NavTab; subTab?: CatalogSubTab }>;
+      if (customEvent.detail?.tab) {
+        handleSelectTab(customEvent.detail.tab, customEvent.detail.subTab);
+      }
+    };
+    window.addEventListener('navigate-tab', handleNavEvent);
+    return () => window.removeEventListener('navigate-tab', handleNavEvent);
+  }, []);
+
   // When user signs in or switches accounts, default directly to customer management
   React.useEffect(() => {
     if (currentUser?.id && currentUser.id !== prevUserIdRef.current) {

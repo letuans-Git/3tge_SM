@@ -18,7 +18,7 @@ import {
   GoodsReceiptNote
 } from '../types';
 
-// Người dùng hệ thống đăng nhập
+// Người dùng quản trị ban đầu
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user_admin',
@@ -27,24 +27,6 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'admin',
     phone: '0913.566.532',
     email: 'admin@3tge.vn',
-    password: '123'
-  },
-  {
-    id: 'user_tech',
-    username: 'kythuat',
-    fullName: 'Nguyễn Văn Hùng - Trưởng Kỹ Thuật',
-    role: 'technician',
-    phone: '0988.123.456',
-    email: 'kythuat@3tge.vn',
-    password: '123'
-  },
-  {
-    id: 'user_cskh',
-    username: 'cskh',
-    fullName: 'Trần Thị Mai - Chăm Sóc Khách Hàng',
-    role: 'cskh',
-    phone: '0905.789.012',
-    email: 'cskh@3tge.vn',
     password: '123'
   }
 ];

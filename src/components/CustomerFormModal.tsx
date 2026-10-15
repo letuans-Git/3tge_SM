@@ -46,7 +46,7 @@ import { useEquipmentBrands } from '../utils/brandUtils';
 import { BrandSelectField } from './BrandSelectField';
 import { PdfViewerModal } from './PdfViewerModal';
 import { resolvePdfFileData } from '../utils/pdfStorage';
-import { useDistributors } from '../utils/distributorUtils';
+import { useData } from '../context/DataContext';
 import { DistributorSelectField } from './DistributorSelectField';
 
 interface CustomerFormModalProps {
@@ -85,10 +85,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     addBrand 
   } = useEquipmentBrands();
 
-  const {
-    distributors,
-    addDistributor
-  } = useDistributors();
+  const { suppliers } = useData();
+  const defaultDistributor = React.useMemo(() => {
+    return suppliers.find(s => s.name?.toUpperCase() === 'HTPRO189')?.name || suppliers[0]?.name || 'HTPRO189';
+  }, [suppliers]);
 
   // Form states
   const [customerName, setCustomerName] = useState(capitalizeWords(initialData?.customerName || ''));
@@ -321,7 +321,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         brand: inverterBrands.includes('GOODWE') ? 'GOODWE' : (inverterBrands[0] || 'GOODWE'),
         capacityKW: 10,
         phase: '3 pha',
-        distributor: distributors[0] || 'HTPRO189'
+        distributor: defaultDistributor
       }
     ]);
   };
@@ -346,7 +346,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         serialNumber: '',
         brand: batteryBrands[0] || 'PYLONTECH',
         capacityKWh: 5.12,
-        distributor: distributors[0] || 'HTPRO189'
+        distributor: defaultDistributor
       }
     ]);
   };
@@ -370,7 +370,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         serialNumber: '',
         brand: windBrands[0] || 'HY_ENERGY',
         capacityKW: 5,
-        distributor: distributors[0] || 'HTPRO189'
+        distributor: defaultDistributor
       }
     ]);
   };
@@ -813,9 +813,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     <DistributorSelectField
                       label="Nhà phân phối"
                       value={inv.distributor}
-                      availableDistributors={distributors}
                       onChange={(val) => handleUpdateInverter(idx, 'distributor', val)}
-                      onAddNewDistributor={addDistributor}
                     />
                   </div>
                 </div>
@@ -893,9 +891,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       <DistributorSelectField
                         label="Nhà phân phối"
                         value={bat.distributor}
-                        availableDistributors={distributors}
                         onChange={(val) => handleUpdateBattery(idx, 'distributor', val)}
-                        onAddNewDistributor={addDistributor}
                       />
                     </div>
                   </div>
@@ -991,9 +987,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               <DistributorSelectField
                 label="Nhà phân phối"
                 value={solarPanels.distributor}
-                availableDistributors={distributors}
                 onChange={(val) => setSolarPanels({ ...solarPanels, distributor: val })}
-                onAddNewDistributor={addDistributor}
               />
             </div>
           </div>
@@ -1075,9 +1069,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       <DistributorSelectField
                         label="Nhà phân phối"
                         value={wind.distributor}
-                        availableDistributors={distributors}
                         onChange={(val) => handleUpdateWindTurbine(idx, 'distributor', val)}
-                        onAddNewDistributor={addDistributor}
                       />
                     </div>
                   </div>
