@@ -42,7 +42,9 @@ import {
   Share2,
   FileText,
   FileCheck,
-  Paperclip
+  FolderOpen,
+  Paperclip,
+  Lock
 } from 'lucide-react';
 import { Customer, SystemStatus, CustomerPdfDocument } from '../types';
 import { useData } from '../context/DataContext';
@@ -671,6 +673,24 @@ export const CustomersView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Nút Xem Thư Mục Hóa Đơn Mua Vào NCC Theo Tháng */}
+          {hasPermission('customer_pdf_view') && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('navigate-tab', { detail: { tab: 'reports', reportTab: 'documents' } })
+                );
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50/80 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+              title="Mở thư mục thống kê toàn bộ hóa đơn mua vào từ nhà cung cấp theo từng tháng"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Thư Mục HĐ Mua Vào NCC</span>
+              <span className="sm:hidden">HĐ Mua Vào</span>
+            </button>
+          )}
+
           {/* Nút tải Trợ lý Zalo PC */}
           <a
             href="/Zalo-Auto-Send-3TGE.bat"
@@ -1545,7 +1565,12 @@ export const CustomersView: React.FC = () => {
                 </span>
               </div>
 
-              {viewingCustomer.pdfDocuments && viewingCustomer.pdfDocuments.length > 0 ? (
+              {!hasPermission('customer_pdf_view') ? (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg flex items-center gap-2 text-xs text-amber-800 font-medium">
+                  <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Bạn chưa được cấp quyền xem hoặc tải file Hóa đơn & CO/CQ. Vui lòng liên hệ Quản trị viên để được phân quyền.</span>
+                </div>
+              ) : viewingCustomer.pdfDocuments && viewingCustomer.pdfDocuments.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {viewingCustomer.pdfDocuments.map((doc) => {
                     const isInvoice = doc.category === 'invoice';
@@ -1592,15 +1617,25 @@ export const CustomersView: React.FC = () => {
                             <Eye className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline text-[10px]">Xem</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadPdf(doc)}
-                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs flex items-center gap-1 transition"
-                            title="Tải tệp PDF về máy"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline text-[10px]">Tải</span>
-                          </button>
+                          {hasPermission('customer_pdf_download') ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdf(doc)}
+                              className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs flex items-center gap-1 transition"
+                              title="Tải tệp PDF về máy"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline text-[10px]">Tải</span>
+                            </button>
+                          ) : (
+                            <span
+                              className="p-1.5 bg-slate-100 text-slate-400 rounded-md font-medium text-[10px] flex items-center gap-0.5 cursor-not-allowed select-none"
+                              title="Bạn không có quyền tải file"
+                            >
+                              <Lock className="w-3 h-3 text-amber-500" />
+                              <span className="hidden sm:inline">Khóa</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -2104,6 +2139,7 @@ export const CustomersView: React.FC = () => {
         customerId={viewingCustomer?.id}
         onClose={() => setPreviewPdfDoc(null)}
         onDownload={handleDownloadPdf}
+        canDownload={hasPermission('customer_pdf_download')}
       />
     </div>
   );

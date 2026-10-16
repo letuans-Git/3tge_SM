@@ -47,6 +47,7 @@ import { BrandSelectField } from './BrandSelectField';
 import { PdfViewerModal } from './PdfViewerModal';
 import { resolvePdfFileData } from '../utils/pdfStorage';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { DistributorSelectField } from './DistributorSelectField';
 
 interface CustomerFormModalProps {
@@ -86,6 +87,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   } = useEquipmentBrands();
 
   const { suppliers } = useData();
+  const { hasPermission } = useAuth();
   const defaultDistributor = React.useMemo(() => {
     return suppliers.find(s => s.name?.toUpperCase() === 'HTPRO189')?.name || suppliers[0]?.name || 'HTPRO189';
   }, [suppliers]);
@@ -2097,6 +2099,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         customerId={initialData?.id}
         onClose={() => setPreviewPdf(null)}
         onDownload={handleDownloadPdf}
+        canDownload={hasPermission('customer_pdf_download')}
       />
     </div>
   );

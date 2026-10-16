@@ -16,7 +16,9 @@ import {
   UserCheck,
   FolderTree,
   WalletCards,
-  Building2
+  Building2,
+  FileCheck,
+  FolderOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
@@ -24,12 +26,13 @@ import { PermissionAction } from '../types/permissions';
 import { UserManagementModal } from './UserManagementModal';
 import { PWAInstallButton } from './PWAInstallButton';
 import { CatalogSubTab } from './CatalogView';
+import { ReportTabType } from './ReportsView';
 
 export type NavTab = 'dashboard' | 'customers' | 'maintenance' | 'inventory' | 'cashflow' | 'catalog' | 'reports';
 
 interface NavbarProps {
   currentTab: NavTab;
-  onSelectTab: (tab: NavTab, subTab?: CatalogSubTab) => void;
+  onSelectTab: (tab: NavTab, subTab?: CatalogSubTab, reportTab?: ReportTabType) => void;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
   isOnline: boolean;
@@ -45,7 +48,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { currentUser, users, logout, switchUserAccount, hasRole, hasPermission } = useAuth();
   const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
   const [catalogDropdownOpen, setCatalogDropdownOpen] = useState(false);
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const dropdownTimeoutRef = React.useRef<any>(null);
+  const reportsTimeoutRef = React.useRef<any>(null);
 
   const handleMouseEnterCatalog = () => {
     if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
@@ -55,6 +60,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleMouseLeaveCatalog = () => {
     dropdownTimeoutRef.current = setTimeout(() => {
       setCatalogDropdownOpen(false);
+    }, 200);
+  };
+
+  const handleMouseEnterReports = () => {
+    if (reportsTimeoutRef.current) clearTimeout(reportsTimeoutRef.current);
+    setReportsDropdownOpen(true);
+  };
+
+  const handleMouseLeaveReports = () => {
+    reportsTimeoutRef.current = setTimeout(() => {
+      setReportsDropdownOpen(false);
     }, 200);
   };
 
@@ -192,6 +208,115 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div>
                               <div className="font-bold text-slate-800">3. Nhà Cung Cấp</div>
                               <div className="text-[10px] text-slate-400 font-normal">Đối tác phân phối thiết bị, MST & SĐT</div>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (item.id === 'reports') {
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="relative"
+                      onMouseEnter={handleMouseEnterReports}
+                      onMouseLeave={handleMouseLeaveReports}
+                    >
+                      <button
+                        onClick={() => {
+                          onSelectTab('reports');
+                          setReportsDropdownOpen(false);
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          isActive
+                            ? 'bg-emerald-50 text-emerald-700 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-emerald-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
+                        <span>{item.label}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform text-slate-400 ${reportsDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown Menu for Reports */}
+                      {reportsDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                            <span>Báo Cáo & Thống Kê 3TGE</span>
+                            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                              Chứng từ PDF
+                            </span>
+                          </div>
+
+                          {/* Nổi bật: Thư mục Hóa Đơn Mua Vào NCC theo tháng */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'documents');
+                              setReportsDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-amber-800 hover:bg-amber-50/70 flex items-center gap-2.5 transition border-b border-slate-50"
+                          >
+                            <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg shrink-0">
+                              <FolderOpen className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                <span>Thư Mục HĐ Mua Vào NCC</span>
+                                <span className="text-[9px] font-bold text-amber-800 bg-amber-100/70 px-1 rounded border border-amber-300">
+                                  Theo tháng
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-normal">
+                                Mỗi tháng 1 thư mục hóa đơn mua vào từ nhà cung cấp
+                              </div>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'ontime');
+                              setReportsDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <CalendarClock className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">1. Đúng Hạn & Quá Hạn Bảo Dưỡng</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Cảnh báo trạm quá hạn, chu kỳ +180 ngày</div>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'technician');
+                              setReportsDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <UserCheck className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">2. Năng Suất Kỹ Thuật Viên</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Số phiếu hoàn thành & đang xử lý</div>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'brands');
+                              setReportsDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/60 flex items-center gap-2.5 transition"
+                          >
+                            <BarChart3 className="w-4 h-4 text-emerald-600" />
+                            <div>
+                              <div className="font-bold text-slate-800">3. Hãng Thiết Bị & Công Suất</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Thống kê Inverter, Pin lưu trữ & KW</div>
                             </div>
                           </button>
                         </div>
@@ -375,6 +500,62 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <span className="flex items-center gap-2">
                               <Building2 className="w-3.5 h-3.5 text-emerald-600" />
                               3. Danh Mục Nhà Cung Cấp
+                            </span>
+                            <ChevronRight className="w-3 h-3 text-slate-300" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (item.id === 'reports') {
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          onClick={() => {
+                            onSelectTab('reports');
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700 font-bold'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={isActive ? 'text-emerald-600' : 'text-slate-400'}>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </button>
+
+                        {/* Indented Subcategories for Reports on Mobile */}
+                        <div className="pl-6 pr-2 py-1 space-y-1 border-l-2 border-indigo-200 ml-4">
+                          <button
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'documents');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-bold text-amber-800 hover:bg-amber-50/80 bg-amber-50/50 rounded transition"
+                          >
+                            <span className="flex items-center gap-2">
+                              <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Thư Mục HĐ Mua Vào NCC</span>
+                            </span>
+                            <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-extrabold border border-amber-200">
+                              Theo Tháng
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSelectTab('reports', undefined, 'ontime');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between py-1.5 px-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded"
+                          >
+                            <span className="flex items-center gap-2">
+                              <CalendarClock className="w-3.5 h-3.5 text-emerald-600" />
+                              Báo Cáo Bảo Dưỡng
                             </span>
                             <ChevronRight className="w-3 h-3 text-slate-300" />
                           </button>

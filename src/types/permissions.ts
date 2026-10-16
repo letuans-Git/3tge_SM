@@ -3,13 +3,15 @@ export type PermissionAction =
   | 'dashboard_view'
   | 'dashboard_export'
   
-  // Quản lý Khách hàng
+  // Quản lý Khách hàng & Hồ sơ chứng từ
   | 'customer_view'
   | 'customer_create'
   | 'customer_edit'
   | 'customer_disable'
   | 'customer_delete'
   | 'customer_export'
+  | 'customer_pdf_view'
+  | 'customer_pdf_download'
 
   // Bảo trì & Nhắc lịch
   | 'maintenance_schedule_view'
@@ -86,6 +88,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { id: 'customer_disable', name: 'Vô hiệu hóa / Khôi phục KH', description: 'Tạm ngưng hồ sơ khách hàng, chuyển vào danh sách vô hiệu hóa' },
       { id: 'customer_delete', name: 'Xóa vĩnh viễn khách hàng', description: 'Chỉ được phép xóa sau khi khách hàng đã bị vô hiệu hóa' },
       { id: 'customer_export', name: 'Xuất Excel khách hàng', description: 'Xuất toàn bộ danh sách khách hàng ra tệp Excel' },
+      { id: 'customer_pdf_view', name: 'Xem & thống kê Hóa đơn mua vào NCC', description: 'Xem các thư mục tháng và mở xem tệp PDF hóa đơn mua vào từ nhà cung cấp' },
+      { id: 'customer_pdf_download', name: 'Tải file Hóa đơn mua vào NCC', description: 'Cho phép tải tệp PDF hóa đơn mua vào từ nhà cung cấp về máy tính hoặc điện thoại' },
     ]
   },
   {
@@ -178,7 +182,7 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     defaultPermissions: [
       // All permissions
       'dashboard_view', 'dashboard_export',
-      'customer_view', 'customer_create', 'customer_edit', 'customer_disable', 'customer_delete', 'customer_export',
+      'customer_view', 'customer_create', 'customer_edit', 'customer_disable', 'customer_delete', 'customer_export', 'customer_pdf_view', 'customer_pdf_download',
       'maintenance_schedule_view', 'maintenance_record_create', 'maintenance_record_edit', 'maintenance_record_delete', 'maintenance_record_view', 'maintenance_notify_send', 'maintenance_pdf_export',
       'inventory_view', 'inventory_import', 'inventory_export', 'inventory_item_create', 'inventory_item_edit', 'inventory_excel_export',
       'cashflow_view', 'cashflow_receipt_create', 'cashflow_payment_create', 'cashflow_delete', 'cashflow_excel_export',
@@ -208,7 +212,7 @@ export const SYSTEM_ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     description: 'Tiếp nhận thông tin khách hàng, gửi tin nhắc lịch bảo dưỡng, quản lý thu chi hợp đồng và sổ quỹ.',
     defaultPermissions: [
       'dashboard_view',
-      'customer_view', 'customer_create', 'customer_edit', 'customer_export',
+      'customer_view', 'customer_create', 'customer_edit', 'customer_export', 'customer_pdf_view', 'customer_pdf_download',
       'maintenance_schedule_view', 'maintenance_notify_send', 'maintenance_record_view',
       'cashflow_view', 'cashflow_receipt_create', 'cashflow_payment_create', 'cashflow_excel_export',
       'reports_view',

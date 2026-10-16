@@ -224,3 +224,55 @@ export function exportMaintenancePDF(record: MaintenanceRecord) {
     doc.save(`PhieuBaoDuong_${record.maintenanceCode}.pdf`);
   }
 }
+
+export function exportDocumentStatsToExcel(
+  monthlyStats: Array<{
+    monthKey: string;
+    monthLabel: string;
+    invoiceCount: number;
+    suppliersListStr: string;
+    customerCount: number;
+    totalSizeLabel: string;
+  }>,
+  detailDocs: Array<{
+    monthLabel: string;
+    supplierName: string;
+    customerCode: string;
+    customerName: string;
+    phoneNumber: string;
+    address: string;
+    fileName: string;
+    fileSize: string;
+    uploadedAt: string;
+  }>
+) {
+  const summaryData = monthlyStats.map((m, idx) => ({
+    'STT': idx + 1,
+    'Thư Mục Tháng': m.monthLabel,
+    'Số Hóa Đơn Mua Vào': m.invoiceCount,
+    'Các Nhà Cung Cấp': m.suppliersListStr || 'Chưa ghi nhận',
+    'Số Trạm / Công Trình': m.customerCount,
+    'Tổng Dung Lượng File': m.totalSizeLabel
+  }));
+
+  const detailData = detailDocs.map((d, idx) => ({
+    'STT': idx + 1,
+    'Thư Mục Tháng': d.monthLabel,
+    'Tên File Hóa Đơn (.PDF)': d.fileName,
+    'Nhà Cung Cấp Xuất HĐ': d.supplierName,
+    'Mã Khách Hàng': d.customerCode,
+    'Tên Khách Hàng / Công Trình': d.customerName,
+    'Số Điện Thoại': d.phoneNumber,
+    'Địa Chỉ Lắp Đặt': d.address,
+    'Dung Lượng File': d.fileSize,
+    'Ngày Hóa Đơn / Tải Lên': d.uploadedAt
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+  const detailSheet = XLSX.utils.json_to_sheet(detailData);
+  
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'ThuMucThang_TongHop');
+  XLSX.utils.book_append_sheet(workbook, detailSheet, 'DanhSach_HoaDonMuaVao');
+  downloadWorkbook(workbook, `3TGE_HoaDon_MuaVao_NhaCungCap_TheoThang_${new Date().toISOString().split('T')[0]}.xlsx`);
+}

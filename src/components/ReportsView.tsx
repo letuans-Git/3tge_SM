@@ -9,19 +9,34 @@ import {
   ShieldCheck, 
   Zap, 
   Clock,
-  Printer
+  Printer,
+  FileCheck,
+  FolderOpen
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { exportCustomersToExcel, exportMaintenanceToExcel, exportCashFlowToExcel, exportInventoryToExcel } from '../utils/exportUtils';
 import { useAuth } from '../context/AuthContext';
 import { formatDateVN } from '../utils/dateUtils';
 import { getSavedBrands } from '../utils/brandUtils';
+import { MonthlyDocumentStatsReport } from './MonthlyDocumentStatsReport';
 
-export const ReportsView: React.FC = () => {
+export type ReportTabType = 'ontime' | 'overdue' | 'technician' | 'brands' | 'warranty' | 'capacity' | 'documents';
+
+interface ReportsViewProps {
+  initialReportTab?: ReportTabType;
+}
+
+export const ReportsView: React.FC<ReportsViewProps> = ({ initialReportTab = 'ontime' }) => {
   const { customers, maintenanceRecords, cashTransactions, inventory } = useData();
   const { hasPermission } = useAuth();
 
-  const [activeReportTab, setActiveReportTab] = useState<'ontime' | 'overdue' | 'technician' | 'brands' | 'warranty' | 'capacity'>('ontime');
+  const [activeReportTab, setActiveReportTab] = useState<ReportTabType>(initialReportTab);
+
+  React.useEffect(() => {
+    if (initialReportTab) {
+      setActiveReportTab(initialReportTab);
+    }
+  }, [initialReportTab]);
 
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
@@ -130,6 +145,7 @@ export const ReportsView: React.FC = () => {
           { id: 'brands' as const, label: '4. Theo hãng thiết bị', icon: <BarChart3 className="w-3.5 h-3.5" /> },
           { id: 'warranty' as const, label: '5. Tình trạng bảo hành', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
           { id: 'capacity' as const, label: '6. Tổng công suất lắp đặt', icon: <Zap className="w-3.5 h-3.5 text-amber-500" /> },
+          { id: 'documents' as const, label: '7. Hóa đơn mua vào NCC (Theo tháng)', icon: <FolderOpen className="w-3.5 h-3.5 text-amber-500" /> },
         ].map(tab => (
           <button
             key={tab.id}
@@ -393,6 +409,11 @@ export const ReportsView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 7. MONTHLY INVOICE & CO/CQ DOCUMENTS STATS REPORT */}
+      {activeReportTab === 'documents' && (
+        <MonthlyDocumentStatsReport />
       )}
     </div>
   );

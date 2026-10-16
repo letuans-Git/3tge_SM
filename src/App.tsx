@@ -7,7 +7,7 @@ import { CustomersView } from './components/CustomersView';
 import { MaintenanceView } from './components/MaintenanceView';
 import { InventoryView } from './components/InventoryView';
 import { CashFlowView } from './components/CashFlowView';
-import { ReportsView } from './components/ReportsView';
+import { ReportsView, ReportTabType } from './components/ReportsView';
 import { CatalogView, CatalogSubTab } from './components/CatalogView';
 import { LoginView } from './components/LoginView';
 import { PhoneCall, ShieldCheck, Sun } from 'lucide-react';
@@ -18,21 +18,28 @@ function MainApp() {
   const { isOnline } = useData();
   const [currentTab, setCurrentTab] = useState<NavTab>('customers');
   const [catalogSubTab, setCatalogSubTab] = useState<CatalogSubTab>('items');
+  const [reportsSubTab, setReportsSubTab] = useState<ReportTabType>('ontime');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const prevUserIdRef = React.useRef<string | null>(null);
 
-  const handleSelectTab = (tab: NavTab, subTab?: CatalogSubTab) => {
+  const handleSelectTab = (tab: NavTab, subTab?: CatalogSubTab, reportTab?: ReportTabType) => {
     if (subTab) {
       setCatalogSubTab(subTab);
+    }
+    if (reportTab) {
+      setReportsSubTab(reportTab);
     }
     setCurrentTab(tab);
   };
 
-  // Lắng nghe sự kiện chuyển tab từ các modul (ví dụ mở nhanh Danh mục Nhà cung cấp)
+  // Lắng nghe sự kiện chuyển tab từ các modul (ví dụ mở nhanh Danh mục Nhà cung cấp hoặc Thống kê chứng từ)
   React.useEffect(() => {
     const handleNavEvent = (e: Event) => {
-      const customEvent = e as CustomEvent<{ tab: NavTab; subTab?: CatalogSubTab }>;
+      const customEvent = e as CustomEvent<{ tab: NavTab; subTab?: CatalogSubTab; reportTab?: ReportTabType }>;
       if (customEvent.detail?.tab) {
+        if (customEvent.detail.reportTab) {
+          setReportsSubTab(customEvent.detail.reportTab);
+        }
         handleSelectTab(customEvent.detail.tab, customEvent.detail.subTab);
       }
     };
@@ -84,7 +91,7 @@ function MainApp() {
         {currentTab === 'inventory' && <InventoryView />}
         {currentTab === 'cashflow' && <CashFlowView />}
         {currentTab === 'catalog' && <CatalogView initialSubTab={catalogSubTab} />}
-        {currentTab === 'reports' && <ReportsView />}
+        {currentTab === 'reports' && <ReportsView initialReportTab={reportsSubTab} />}
       </main>
 
       {/* Compact Clean Footer */}

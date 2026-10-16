@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Maximize2,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 import { CustomerPdfDocument } from '../types';
 import { resolvePdfFileData } from '../utils/pdfStorage';
@@ -32,9 +33,16 @@ interface PdfViewerModalProps {
   customerId?: string;
   onClose: () => void;
   onDownload?: (doc: CustomerPdfDocument) => void;
+  canDownload?: boolean; // Kiểm soát quyền tải file
 }
 
-export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ doc, customerId, onClose, onDownload }) => {
+export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ 
+  doc, 
+  customerId, 
+  onClose, 
+  onDownload,
+  canDownload = true
+}) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.2);
@@ -345,15 +353,25 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ doc, customerId,
             </button>
 
             {/* Download */}
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="px-2.5 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-xs transition"
-              title="Tải tệp PDF về máy"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Tải về</span>
-            </button>
+            {canDownload ? (
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="px-2.5 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-xs transition"
+                title="Tải tệp PDF về máy"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tải về</span>
+              </button>
+            ) : (
+              <div 
+                className="px-2 py-1 text-[10px] bg-slate-800 text-slate-400 font-semibold rounded-lg flex items-center gap-1 border border-slate-700 select-none"
+                title="Bạn không có quyền tải tệp này về máy"
+              >
+                <Lock className="w-3 h-3 text-amber-400" />
+                <span className="hidden sm:inline">Chỉ xem</span>
+              </div>
+            )}
 
             {/* Close */}
             <button
@@ -386,22 +404,31 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ doc, customerId,
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Tải Về Máy Ngay</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenNewTab}
-                  className="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Mở Tab Mới</span>
-                </button>
+                {canDownload ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Tải Về Máy Ngay</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewTab}
+                      className="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Mở Tab Mới</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-xs text-amber-400 font-semibold flex items-center gap-1 bg-amber-950/60 px-3 py-1.5 rounded-lg border border-amber-700/50">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Bạn chỉ có quyền xem trực tiếp, không được phân quyền tải file về máy</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
